@@ -3,7 +3,7 @@
 
 struct TouchSensor
 {
-    
+
 };
 
 #endif //ROBOCOREPRINTERFRONT_TOUCHSENSOR_H
