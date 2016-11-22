@@ -270,24 +270,49 @@ private:
         return true;
     }
 
-    void moveY(int i, bool immediateReturn = false)
+    void moveY(int distance, bool immediateReturn = false)
     {
+        if (yCurrent + distance > HEIGHT_MAX || yCurrent + distance < 0)
+        {
+            Serial << "WIDTH_MAX reached!" << newline
+                   << "xCurrent = " << xCurrent << newline
+                   <<  "distance = " << distance << newline;
 
+            syst.waitMS(2000);
+
+            while(true);
+        }
+
+        yCurrent += distance;
+        mY.rotate(-distance * PIX_ROTATION, immediateReturn);
     }
 
     void calibrateX()
     {
-
+        // TODO
     }
 
     void calibrateY()
     {
+        const int distance = 10000;
 
+        mY.setSpeed(mYSpeed / 2);
+        mY.rotate(distance * PIX_ROTATION, true);
+
+        while (mY.isMoving())
+        {
+            if(rTouch.isPushed())
+            {
+                mY.stop();
+                mY.setSpeed(mYSpeed);
+                yCurrent = 0;
+            }
+        }
     }
 
     void pauseButtonPushed()
     {
-
+        // TODO
     }
 
     void showStats()
