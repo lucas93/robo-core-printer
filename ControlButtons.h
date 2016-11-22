@@ -1,0 +1,19 @@
+#ifndef ROBOCOREPRINTERFRONT_CONTROLBUTTONS_H
+#define ROBOCOREPRINTERFRONT_CONTROLBUTTONS_H
+
+enum class Button
+{
+    ID_UP,
+    ID_DOWN,
+    ID_LEFT,
+    ID_ENTER,
+    ID_ESCAPE,
+    ID_RIGHT
+};
+
+Button waitForAnyPress()
+{
+    return Button::ID_DOWN;
+}
+
+#endif //ROBOCOREPRINTERFRONT_CONTROLBUTTONS_H

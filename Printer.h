@@ -5,6 +5,8 @@
 #include "Motor.h"
 #include "TouchSensor.h"
 #include "SerialDisplay.h"
+#include "ControlButtons.h"
+#include "System.h"
 
 class Printer
 {
@@ -68,19 +70,207 @@ private:
 
     void printImage()
     {
+        bool ok = true;
+
         for (auto & r : image)
         {
             if (isPauseButtonPushed)
-            {
                 pauseButtonPushed();
-            }
+
             isPauseButtonPushed = false;
 
             showStats();
+
+            for(auto & p : r)
+            {
+                PenDown();
+                ok = moveX(p.length());
+
+                if (!ok)
+                {
+                    PenUp();
+                    break;
+                }
+
+                PenUp();
+                ok = moveX(-p.spaceBefore(), 1.3);
+                if (!ok)
+                    break;
+            }
+            if (!ok)
+                break;
+            moveY(1, true);
         }
     }
 
-    void calibratePen()
+    void calibratePen(bool shouldCalibrateX = true)
+    {
+        Button button;
+
+        do {
+            Serial << "UP - amplitude calibrate" << newline
+                   << "DOWN - position calibrate" << newline
+                   << "LEFT - step calibrate" << newline
+                   << "ENTER - accept" << newline
+                   << "ESCAPE - try and accept";
+
+            button = waitForAnyPress();
+
+            switch (button) {
+            case Button::ID_UP:
+                calibratePenAmplitude();
+                break;
+            case Button::ID_DOWN:
+                calibratePenPosition();
+                break;
+            case Button::ID_LEFT:
+                calibratePenCalibrationStep();
+                break;
+            case Button::ID_ENTER:
+                break;
+            case Button::ID_ESCAPE:
+                penTest();
+                break;
+            }
+        } while(button != Button::ID_ENTER);
+
+        Serial.clear();
+
+        if(shouldCalibrateX)
+            calibrateX();
+    }
+
+    void calibratePenAmplitude()
+    {
+        Button button;
+
+        do {
+            Serial << "UP - top higher" << newline
+                   << "LEFT - top lower" << newline
+                   << "DOWN - down lower" << newline
+                   << "RIGHT - down higher" << newline
+                   << "ENTER - accept" << newline
+                   << "ESCAPE - try";
+
+            button = waitForAnyPress();
+
+            switch (button)
+            {
+                case Button::ID_UP:
+                    zRotation += zCalibrationStep;
+                    mZ.rotate(-zCalibrationStep);
+                    break;
+                case Button::ID_LEFT:
+                    zRotation -= zCalibrationStep;
+                    mZ.rotate(zCalibrationStep);
+                    break;
+                case Button::ID_DOWN:
+                    zRotation += zCalibrationStep;
+                    break;
+                case Button::ID_RIGHT:
+                    zRotation -= zCalibrationStep;
+                    break;
+                case Button::ID_ESCAPE:
+                    penTest();
+                    break;
+                default:
+                    break;
+            }
+        } while(button != Button::ID_ENTER);
+    }
+
+    void calibratePenPosition()
+    {
+        Button button;
+
+        do {
+            Serial << "UP - pen higher" << newline
+                   << "LEFT - pen much higher" << newline
+                   << "DOWN - pen lower" << newline
+                   << "RIGHT - pen much lower" << newline
+                   << "ENTER - accept" << newline
+                   << "ESCAPE - try";
+
+            button = waitForAnyPress();
+
+            switch (button)
+            {
+                case Button::ID_UP:
+                    mZ.rotate(-zCalibrationStep);
+                    break;
+                case Button::ID_LEFT:
+                    mZ.rotate(-4 * zCalibrationStep);
+                    break;
+                case Button::ID_DOWN:
+                    mZ.rotate(zCalibrationStep);
+                    break;
+                case Button::ID_RIGHT:
+                    mZ.rotate(4 * zCalibrationStep);
+                    break;
+                case Button::ID_ESCAPE:
+                    penTest();
+                default:
+                    break;
+            }
+        } while(button != Button::ID_ENTER);
+    }
+
+    void calibratePenCalibrationStep()
+    {
+        // TODO optional
+    }
+
+    void penTest()
+    {
+        PenDown();
+        PenUp();
+    }
+
+    void PenDown()
+    {
+        mZ.rotate(zRotation);
+    }
+
+    void PenUp()
+    {
+        mZ.rotate(-zRotation);
+    }
+
+    bool moveX(int distance, double speedMultiper = 1.0)
+    {
+        if(speedMultiper < 0.0)
+            speedMultiper = -speedMultiper;
+
+        if (xCurrent + distance > WIDTH_MAX || xCurrent + distance < 0)
+        {
+            Serial << "WIDTH_MAX reached!" << newline
+                   << "xCurrent = " << xCurrent << newline
+                   <<  "distance = " << distance << newline;
+
+            syst.waitMS(2000);
+
+            while(true);
+        }
+
+        mX.setSpeed((int) (mXSpeed * speedMultiper));
+        mX.rotate(distance * PIX_ROTATION, true);
+
+        while (mX.isMoving())
+        {
+            if(rTouch.isPushed() or lTouch.isPushed())
+            {
+                mX.stop();
+                Serial << "OUT OF BOUNDRIES!";
+                while(true);
+            }
+        }
+
+        xCurrent += distance;
+        mX.setSpeed(mXSpeed);
+        return true;
+    }
+
+    void moveY(int i, bool immediateReturn = false)
     {
 
     }
