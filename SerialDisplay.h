@@ -1,24 +1,46 @@
 #ifndef ROBOCOREPRINTERFRONT_SERIALDISPLAY_H
 #define ROBOCOREPRINTERFRONT_SERIALDISPLAY_H
 
+#include "hCloudClient.h"
+#include <string>
+
 struct SerialDisplay
 {
-    template <typename T>
-    void print(T str)
+    void print(const char * str)
     {
+        platform.ui.console("cl1").printf("%s", str);
+    }
 
+    void print(const std::string & str)
+    {
+        platform.ui.console("cl1").printf("%s", str.c_str());
+    }
+
+    void print(int val)
+    {
+        platform.ui.console("cl1").printf("%d", val);
+    }
+
+    void print(long unsigned int val)
+    {
+        platform.ui.console("cl1").printf("%u", val);
+    }
+
+    void print(double val)
+    {
+        platform.ui.console("cl1").printf("%f", val);
     }
 
     void clear()
     {
 
     }
-} Serial;
+} console;
 
 template <typename T>
-SerialDisplay& operator<< (SerialDisplay& serial, T str)
+SerialDisplay& operator<< (SerialDisplay& serial, T&& string_to_print)
 {
-    serial.print(str);
+    serial.print(string_to_print);
     return serial;
 }
 
