@@ -14,7 +14,7 @@ private:
     Image image;
     String imageDataFileName = "imageData.img";
 
-    const RegulatedMotor mX, mY, mZ;
+    RegulatedMotor mX, mY, mZ;
     const int mXSpeed = 200;
     const int mYSpeed = 80;
     const int mZSpeed = 600;
