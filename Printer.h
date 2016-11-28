@@ -34,7 +34,7 @@ private:
 
     bool isPauseButtonPushed = false;
 
-    const PIX_ROTATION = 20; // elemental servo rotation for 1 pixel
+    const int PIX_ROTATION = 20; // elemental servo rotation for 1 pixel
 
 public:
 
@@ -44,7 +44,6 @@ public:
         mY.setSpeed(mYSpeed);
         mZ.setSpeed(mZSpeed);
         // TODO optional - prepare menu handling
-
         loadImage();
 
         Serial << "Loaded image data";
@@ -66,6 +65,7 @@ private:
         calibratePen();
         calibrateX();
         calibrateY();
+        displayCalibrationParameters();
     }
 
     void printImage()
@@ -313,6 +313,11 @@ private:
     void pauseButtonPushed()
     {
         // TODO
+    }
+
+    void displayCalibrationParameters()
+    {
+        console << "zRotation = " << zRotation;
     }
 
     void showStats()
