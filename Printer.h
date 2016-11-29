@@ -1,7 +1,7 @@
 #ifndef ROBOCOREPRINTERFRONT_PRINTER_H
 #define ROBOCOREPRINTERFRONT_PRINTER_H
 
-#include "Image.h"
+#include "ProcessedImage.h"
 #include "Motor.h"
 #include "TouchSensor.h"
 #include "SerialDisplay.h"
@@ -11,7 +11,7 @@
 class Printer
 {
 private:
-    Image image;
+    ProcessedImage image;
     String imageDataFileName = "imageData.img";
 
     RegulatedMotor mX, mY, mZ;
@@ -134,7 +134,7 @@ private:
             }
         } while(button != Button::ID_ENTER);
 
-        Serial.clear();
+        console.clear();
 
         if(shouldCalibrateX)
             calibrateX();
@@ -145,7 +145,7 @@ private:
         Button button;
 
         do {
-            Serial << "UP - top higher" << newline
+            console << "UP - top higher" << newline
                    << "LEFT - top lower" << newline
                    << "DOWN - down lower" << newline
                    << "RIGHT - down higher" << newline
@@ -184,7 +184,7 @@ private:
         Button button;
 
         do {
-            Serial << "UP - pen higher" << newline
+            console << "UP - pen higher" << newline
                    << "LEFT - pen much higher" << newline
                    << "DOWN - pen lower" << newline
                    << "RIGHT - pen much lower" << newline
@@ -243,7 +243,7 @@ private:
 
         if (xCurrent + distance > WIDTH_MAX || xCurrent + distance < 0)
         {
-            Serial << "WIDTH_MAX reached!" << newline
+            console << "WIDTH_MAX reached!" << newline
                    << "xCurrent = " << xCurrent << newline
                    <<  "distance = " << distance << newline;
 
@@ -260,7 +260,7 @@ private:
             if(rTouch.isPushed() or lTouch.isPushed())
             {
                 mX.stop();
-                Serial << "OUT OF BOUNDRIES!";
+                console << "OUT OF BOUNDRIES!";
                 while(true);
             }
         }
@@ -274,7 +274,7 @@ private:
     {
         if (yCurrent + distance > HEIGHT_MAX || yCurrent + distance < 0)
         {
-            Serial << "WIDTH_MAX reached!" << newline
+            console << "WIDTH_MAX reached!" << newline
                    << "xCurrent = " << xCurrent << newline
                    <<  "distance = " << distance << newline;
 
@@ -330,6 +330,17 @@ private:
         // TODO
     }
 
+    template<typename T, typename... Args>
+    void printOptionsToConsole(String str, Args... args)
+    {
+        console << str << newline;
+        printOptionsToConsole(args...);
+    }
+    template<>
+    void printOptionsToConsole(String str)
+    {
+        console << str << newline;
+    }
 };
 
 #endif //ROBOCOREPRINTERFRONT_PRINTER_H
