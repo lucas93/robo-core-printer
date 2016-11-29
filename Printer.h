@@ -191,8 +191,6 @@ private:
                    << "ENTER - accept" << newline
                    << "ESCAPE - try";
 
-            button = waitForAnyPress();
-
             switch (button)
             {
                 case Button::ID_UP:
