@@ -1,344 +1,84 @@
-#ifndef ROBOCOREPRINTERFRONT_PRINTER_H
-#define ROBOCOREPRINTERFRONT_PRINTER_H
+#ifndef ROBOCOREPRINTERFRONT_IMAGE_H
+#define ROBOCOREPRINTERFRONT_IMAGE_H
 
-#include "ProcessedImage.h"
-#include "Motor.h"
-#include "TouchSensor.h"
-#include "SerialDisplay.h"
-#include "ControlButtons.h"
-#include "System.h"
+#include "Row.h"
 
-class Printer
+using ProcessedImage = std::vector<Row>;
+
+ostream & operator<<(ostream & ostr, const ProcessedImage & image)
+{
+    ostr << image.size() << "\n";
+    for(const auto& row : image)
+    {
+        ostr << row << "\n";
+    }
+    return ostr;
+}
+
+class ProcessedImageManager
 {
 private:
-    ProcessedImage image;
-    String imageDataFileName = "imageData.img";
-
-    RegulatedMotor mX, mY, mZ;
-    const int mXSpeed = 200;
-    const int mYSpeed = 80;
-    const int mZSpeed = 600;
-    const TouchSensor lTouch;
-    const TouchSensor rTouch;
-
-    int xCurrent = 0;
-    int yCurrent = 0;
-    const int WIDTH_MAX = 310;
-    const int HEIGHT_MAX = 730;
-    int zRotation = 135;
-    int zCalibrationStep = 5;
-    const int xReverseConstant = 46;
-
-    bool isXCalibrated = false;
-    bool isYCalibrated = false;
-
-    bool isPauseButtonPushed = false;
-
-    const int PIX_ROTATION = 20; // elemental servo rotation for 1 pixel
+    fstream textFile;
 
 public:
-
-    Printer()
+    void saveProcessedImageTextToFile(const ProcessedImage &img, string &filename)
     {
-        mX.setSpeed(mXSpeed);
-        mY.setSpeed(mYSpeed);
-        mZ.setSpeed(mZSpeed);
-        // TODO optional - prepare menu handling
-        loadImage();
-
-        Serial << "Loaded image data";
+        ofstream file;
+        file.open(filename.c_str());
+        file << img;
+        file.close();
     }
 
-    void start()
+    ProcessedImage getProcessedImageFromSD(string &filename)
     {
-        prepareEV3();
+        // TODO
+        return ProcessedImage();
+    }
 
-        printImage();
+    ProcessedImage getProcessedImageFromTextFile(string &filename)
+    {
+        auto img = ProcessedImage();
+        textFile.open(filename.c_str());
 
-        Serial << "\nDone!\n";
+        int numberOfRows;
+        textFile >> numberOfRows;
+        img.reserve(numberOfRows);
+
+        for (int i = 0; i < numberOfRows; ++i)
+        {
+            img.push_back(getRow());
+        }
+
+        textFile.close();
+        return img;
     }
 
 private:
-
-    void prepareEV3()
+    Row getRow()
     {
-        calibratePen();
-        calibrateX();
-        calibrateY();
-        displayCalibrationParameters();
-    }
+        auto row = Row();
 
-    void printImage()
-    {
-        bool ok = true;
+        int numberOfPairs;
+        textFile >> numberOfPairs;
+        row.reserve(numberOfPairs);
 
-        for (auto & r : image)
+        for (int i = 0; i < numberOfPairs; ++i)
         {
-            if (isPauseButtonPushed)
-                pauseButtonPushed();
-
-            isPauseButtonPushed = false;
-
-            showStats();
-
-            for(auto & p : r)
-            {
-                PenDown();
-                ok = moveX(p.length());
-
-                if (!ok)
-                {
-                    PenUp();
-                    break;
-                }
-
-                PenUp();
-                ok = moveX(-p.spaceBefore(), 1.3);
-                if (!ok)
-                    break;
-            }
-            if (!ok)
-                break;
-            moveY(1, true);
+            row.push_back(getLine());
         }
+        return row;
     }
 
-    void calibratePen(bool shouldCalibrateX = true)
+    Line getLine()
     {
-        Button button;
+        Line::point_type a, b;
 
-        do {
-            Serial << "UP - amplitude calibrate" << newline
-                   << "DOWN - position calibrate" << newline
-                   << "LEFT - step calibrate" << newline
-                   << "ENTER - accept" << newline
-                   << "ESCAPE - try and accept";
+        textFile >> a;
+        textFile >> b;
 
-            button = waitForAnyPress();
-
-            switch (button) {
-            case Button::ID_UP:
-                calibratePenAmplitude();
-                break;
-            case Button::ID_DOWN:
-                calibratePenPosition();
-                break;
-            case Button::ID_LEFT:
-                calibratePenCalibrationStep();
-                break;
-            case Button::ID_ENTER:
-                break;
-            case Button::ID_ESCAPE:
-                penTest();
-                break;
-            }
-        } while(button != Button::ID_ENTER);
-
-        console.clear();
-
-        if(shouldCalibrateX)
-            calibrateX();
-    }
-
-    void calibratePenAmplitude()
-    {
-        Button button;
-
-        do {
-            console << "UP - top higher" << newline
-                   << "LEFT - top lower" << newline
-                   << "DOWN - down lower" << newline
-                   << "RIGHT - down higher" << newline
-                   << "ENTER - accept" << newline
-                   << "ESCAPE - try";
-
-            button = waitForAnyPress();
-
-            switch (button)
-            {
-                case Button::ID_UP:
-                    zRotation += zCalibrationStep;
-                    mZ.rotate(-zCalibrationStep);
-                    break;
-                case Button::ID_LEFT:
-                    zRotation -= zCalibrationStep;
-                    mZ.rotate(zCalibrationStep);
-                    break;
-                case Button::ID_DOWN:
-                    zRotation += zCalibrationStep;
-                    break;
-                case Button::ID_RIGHT:
-                    zRotation -= zCalibrationStep;
-                    break;
-                case Button::ID_ESCAPE:
-                    penTest();
-                    break;
-                default:
-                    break;
-            }
-        } while(button != Button::ID_ENTER);
-    }
-
-    void calibratePenPosition()
-    {
-        Button button;
-
-        do {
-            console << "UP - pen higher" << newline
-                   << "LEFT - pen much higher" << newline
-                   << "DOWN - pen lower" << newline
-                   << "RIGHT - pen much lower" << newline
-                   << "ENTER - accept" << newline
-                   << "ESCAPE - try";
-
-            switch (button)
-            {
-                case Button::ID_UP:
-                    mZ.rotate(-zCalibrationStep);
-                    break;
-                case Button::ID_LEFT:
-                    mZ.rotate(-4 * zCalibrationStep);
-                    break;
-                case Button::ID_DOWN:
-                    mZ.rotate(zCalibrationStep);
-                    break;
-                case Button::ID_RIGHT:
-                    mZ.rotate(4 * zCalibrationStep);
-                    break;
-                case Button::ID_ESCAPE:
-                    penTest();
-                default:
-                    break;
-            }
-        } while(button != Button::ID_ENTER);
-    }
-
-    void calibratePenCalibrationStep()
-    {
-        // TODO optional
-    }
-
-    void penTest()
-    {
-        PenDown();
-        PenUp();
-    }
-
-    void PenDown()
-    {
-        mZ.rotate(zRotation);
-    }
-
-    void PenUp()
-    {
-        mZ.rotate(-zRotation);
-    }
-
-    bool moveX(int distance, double speedMultiper = 1.0)
-    {
-        if(speedMultiper < 0.0)
-            speedMultiper = -speedMultiper;
-
-        if (xCurrent + distance > WIDTH_MAX || xCurrent + distance < 0)
-        {
-            console << "WIDTH_MAX reached!" << newline
-                   << "xCurrent = " << xCurrent << newline
-                   <<  "distance = " << distance << newline;
-
-            syst.waitMS(2000);
-
-            while(true);
-        }
-
-        mX.setSpeed((int) (mXSpeed * speedMultiper));
-        mX.rotate(distance * PIX_ROTATION, true);
-
-        while (mX.isMoving())
-        {
-            if(rTouch.isPushed() or lTouch.isPushed())
-            {
-                mX.stop();
-                console << "OUT OF BOUNDRIES!";
-                while(true);
-            }
-        }
-
-        xCurrent += distance;
-        mX.setSpeed(mXSpeed);
-        return true;
-    }
-
-    void moveY(int distance, bool immediateReturn = false)
-    {
-        if (yCurrent + distance > HEIGHT_MAX || yCurrent + distance < 0)
-        {
-            console << "WIDTH_MAX reached!" << newline
-                   << "xCurrent = " << xCurrent << newline
-                   <<  "distance = " << distance << newline;
-
-            syst.waitMS(2000);
-
-            while(true);
-        }
-
-        yCurrent += distance;
-        mY.rotate(-distance * PIX_ROTATION, immediateReturn);
-    }
-
-    void calibrateX()
-    {
-        // TODO
-    }
-
-    void calibrateY()
-    {
-        const int distance = 10000;
-
-        mY.setSpeed(mYSpeed / 2);
-        mY.rotate(distance * PIX_ROTATION, true);
-
-        while (mY.isMoving())
-        {
-            if(rTouch.isPushed())
-            {
-                mY.stop();
-                mY.setSpeed(mYSpeed);
-                yCurrent = 0;
-            }
-        }
-    }
-
-    void pauseButtonPushed()
-    {
-        // TODO
-    }
-
-    void displayCalibrationParameters()
-    {
-        console << "zRotation = " << zRotation;
-    }
-
-    void showStats()
-    {
-
-    }
-
-    void loadImage()
-    {
-        // TODO
-    }
-
-    template<typename T, typename... Args>
-    void printOptionsToConsole(String str, Args... args)
-    {
-        console << str << newline;
-        printOptionsToConsole(args...);
-    }
-    template<>
-    void printOptionsToConsole(String str)
-    {
-        console << str << newline;
+        return { a, b };
     }
 };
 
-#endif //ROBOCOREPRINTERFRONT_PRINTER_H
+
+#endif //ROBOCOREPRINTERFRONT_IMAGE_H
