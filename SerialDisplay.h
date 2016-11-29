@@ -4,6 +4,8 @@
 #include "hCloudClient.h"
 #include <string>
 
+#ifdef __HCLOUDCLIENT_H__
+
 struct SerialDisplay
 {
     void print(const char * str)
@@ -36,6 +38,42 @@ struct SerialDisplay
 
     }
 } console;
+
+#else
+
+struct SerialDisplay
+{
+    void print(const char * str)
+    {
+        Serial.printf("%s", str);
+    }
+
+    void print(const std::string & str)
+    {
+        Serial.printf("%s", str.c_str());
+    }
+
+    void print(int val)
+    {
+        Serial.printf("%d", val);
+    }
+
+    void print(long unsigned int val)
+    {
+        Serial.printf("%u", val);
+    }
+
+    void print(double val)
+    {
+        Serial.printf("%f", val);
+    }
+
+    void clear()
+    {
+
+    }
+} console;
+
 
 template <typename T>
 SerialDisplay& operator<< (SerialDisplay& serial, T&& string_to_print)
