@@ -44,9 +44,8 @@ public:
         mY.setSpeed(mYSpeed);
         mZ.setSpeed(mZSpeed);
         // TODO optional - prepare menu handling
-        loadImage();
 
-        Serial << "Loaded image data";
+
     }
 
     void start()
@@ -62,9 +61,11 @@ private:
 
     void prepareEV3()
     {
+        calibrateY();
+        calibrateX();
         calibratePen();
         calibrateX();
-        calibrateY();
+
         displayCalibrationParameters();
     }
 
@@ -325,6 +326,7 @@ private:
 
     void loadImage()
     {
+        Serial << "Loaded image data";
         // TODO
     }
 

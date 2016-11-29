@@ -2,6 +2,7 @@
 #define ROBOCOREPRINTERFRONT_IMAGE_H
 
 #include "Row.h"
+#include <fstream>
 
 using ProcessedImage = std::vector<Row>;
 
