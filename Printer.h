@@ -3,10 +3,14 @@
 
 #include "ProcessedImage.h"
 #include "Motor.h"
-#include "TouchSensor.h"
+//#include "TouchSensor.h"
+#include <hFramework.h>
+#include <Lego_Touch.h>
 #include "SerialDisplay.h"
 #include "ControlButtons.h"
 #include "System.h"
+
+using namespace hSensors;
 
 class Printer
 {
@@ -14,12 +18,14 @@ private:
     ProcessedImage image;
     String imageDataFileName = "imageData.img";
 
-    RegulatedMotor mX, mY, mZ;
+    RegulatedMotor<2> mX;
+    RegulatedMotor<1> mY;
+    RegulatedMotor<6> mZ;
     const int mXSpeed = 200;
     const int mYSpeed = 80;
     const int mZSpeed = 600;
-    const TouchSensor lTouch;
-    const TouchSensor rTouch;
+    Lego_Touch lTouch = Lego_Touch(hSens2);
+    Lego_Touch rTouch = Lego_Touch(hSens1);
 
     int xCurrent = 0;
     int yCurrent = 0;
@@ -54,7 +60,7 @@ public:
 
         printImage();
 
-        Serial << "\nDone!\n";
+        console << "\nDone!\n";
     }
 
 private:
@@ -64,43 +70,22 @@ private:
         calibrateY();
         calibrateX();
         calibratePen();
-        calibrateX();
 
         displayCalibrationParameters();
     }
 
     void printImage()
     {
-        bool ok = true;
-
         for (auto & r : image)
         {
-            if (isPauseButtonPushed)
-                pauseButtonPushed();
-
-            isPauseButtonPushed = false;
-
             showStats();
 
             for(auto & p : r)
             {
-                PenDown();
-                ok = moveX(p.length());
 
-                if (!ok)
-                {
-                    PenUp();
-                    break;
-                }
-
-                PenUp();
-                ok = moveX(-p.spaceBefore(), 1.3);
-                if (!ok)
-                    break;
             }
-            if (!ok)
-                break;
-            moveY(1, true);
+
+            //moveY(1, true);
         }
     }
 
@@ -108,115 +93,104 @@ private:
     {
         Button button;
 
-        do {
-            Serial << "UP - amplitude calibrate" << newline
-                   << "DOWN - position calibrate" << newline
-                   << "LEFT - step calibrate" << newline
-                   << "ENTER - accept" << newline
-                   << "ESCAPE - try and accept";
+        do
+        {
+            console << "A - amplitude calibrate" << newline
+                   << "P - position calibrate" << newline
+                   << "T - try" << newline
+                   << "ENTER - accept";
 
-            button = waitForAnyPress();
+            button = ButtonManager::waitForAnyPress();
 
-            switch (button) {
-            case Button::ID_UP:
+            switch (button)
+            {
+            case Button::Key_A:
                 calibratePenAmplitude();
                 break;
-            case Button::ID_DOWN:
+
+            case Button::Key_P:
                 calibratePenPosition();
                 break;
-            case Button::ID_LEFT:
-                calibratePenCalibrationStep();
-                break;
-            case Button::ID_ENTER:
-                break;
-            case Button::ID_ESCAPE:
+
+            case Button::Key_T:
                 penTest();
                 break;
             }
-        } while(button != Button::ID_ENTER);
-
-        console.clear();
-
-        if(shouldCalibrateX)
-            calibrateX();
+        } while(button != Button::Enter);
     }
 
     void calibratePenAmplitude()
     {
         Button button;
 
-        do {
-            console << "UP - top higher" << newline
-                   << "LEFT - top lower" << newline
-                   << "DOWN - down lower" << newline
-                   << "RIGHT - down higher" << newline
-                   << "ENTER - accept" << newline
-                   << "ESCAPE - try";
+        do
+        {
+            console << "Q - top higher" << newline
+                   << "A - top lower" << newline
+                   << "E - down higher" << newline
+                   << "D - down lower" << newline
+                   << "T - try" << newline
+                   << "ENTER - accept";
 
-            button = waitForAnyPress();
+            button = ButtonManager::waitForAnyPress();
 
             switch (button)
             {
-                case Button::ID_UP:
+                case Button::Key_Q:
                     zRotation += zCalibrationStep;
                     mZ.rotate(-zCalibrationStep);
                     break;
-                case Button::ID_LEFT:
+                case Button::Key_A:
                     zRotation -= zCalibrationStep;
                     mZ.rotate(zCalibrationStep);
                     break;
-                case Button::ID_DOWN:
-                    zRotation += zCalibrationStep;
-                    break;
-                case Button::ID_RIGHT:
+
+                case Button::Key_E:
                     zRotation -= zCalibrationStep;
                     break;
-                case Button::ID_ESCAPE:
+
+                case Button::Key_D:
+                    zRotation += zCalibrationStep;
+                    break;
+
+                case Button::Key_T:
                     penTest();
                     break;
+
                 default:
                     break;
             }
-        } while(button != Button::ID_ENTER);
+        } while(button != Button::Enter);
     }
 
     void calibratePenPosition()
     {
         Button button;
 
-        do {
+        do
+        {
             console << "UP - pen higher" << newline
-                   << "LEFT - pen much higher" << newline
                    << "DOWN - pen lower" << newline
-                   << "RIGHT - pen much lower" << newline
                    << "ENTER - accept" << newline
-                   << "ESCAPE - try";
+                   << "T - try";
 
             switch (button)
             {
-                case Button::ID_UP:
+                case Button::Up:
                     mZ.rotate(-zCalibrationStep);
                     break;
-                case Button::ID_LEFT:
-                    mZ.rotate(-4 * zCalibrationStep);
-                    break;
-                case Button::ID_DOWN:
+
+                case Button::Down:
                     mZ.rotate(zCalibrationStep);
                     break;
-                case Button::ID_RIGHT:
-                    mZ.rotate(4 * zCalibrationStep);
-                    break;
-                case Button::ID_ESCAPE:
-                    penTest();
-                default:
-                    break;
-            }
-        } while(button != Button::ID_ENTER);
-    }
 
-    void calibratePenCalibrationStep()
-    {
-        // TODO optional
+            case Button::Key_T:
+                penTest();
+
+            default:
+                break;
+            }
+        } while(button != Button::Enter);
     }
 
     void penTest()
@@ -256,7 +230,7 @@ private:
 
         while (mX.isMoving())
         {
-            if(rTouch.isPushed() or lTouch.isPushed())
+            if(rTouch.isPressed() or lTouch.isPressed())
             {
                 mX.stop();
                 console << "OUT OF BOUNDRIES!";
@@ -300,7 +274,7 @@ private:
 
         while (mY.isMoving())
         {
-            if(rTouch.isPushed())
+            if(rTouch.isPressed())
             {
                 mY.stop();
                 mY.setSpeed(mYSpeed);
@@ -326,20 +300,8 @@ private:
 
     void loadImage()
     {
-        Serial << "Loaded image data";
+        console << "Loaded image data";
         // TODO
-    }
-
-    template<typename T, typename... Args>
-    void printOptionsToConsole(String str, Args... args)
-    {
-        console << str << newline;
-        printOptionsToConsole(args...);
-    }
-    template<>
-    void printOptionsToConsole(String str)
-    {
-        console << str << newline;
     }
 };
 
