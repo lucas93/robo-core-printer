@@ -42,11 +42,30 @@ struct Line
     }
 };
 
+#ifndef __ISENSOR_H__
+
 ostream & operator<<(ostream & ostr, const Line & line)
 {
     ostr << line.a << " "
          << line.b;
     return ostr;
 }
+
+#endif // #ifndef __ISENSOR_H__
+
+
+
+#ifdef __ISENSOR_H__
+
+#include "SerialDisplay.h"
+template<>
+SerialDisplay& operator<< (SerialDisplay& serial, const Line & line)
+{
+    serial << line.a << " "
+           << line.b;
+    return serial;
+}
+
+#endif // #ifdef __ISENSOR_H__
 
 #endif //ROBOCOREPRINTERFRONT_LINE_H

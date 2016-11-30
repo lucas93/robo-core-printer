@@ -1,35 +1,52 @@
 #ifndef ROBOCOREPRINTERFRONT_SERIALDISPLAY_H
 #define ROBOCOREPRINTERFRONT_SERIALDISPLAY_H
 
-#include "hCloudClient.h"
+
 #include <string>
 
+#ifdef __HCLOUDCLIENT_H__
+
+#define PRINT platform.ui.console("cl1").printf
+
+#endif // #ifdef __HCLOUDCLIENT_H__
+
+
+#ifndef __HCLOUDCLIENT_H__ // #ifdef __ISENSOR_H__
+
+#define PRINT Serial.printf
+
+#endif // #ifndef __HCLOUDCLIENT_H__
 
 struct SerialDisplay
 {
     void print(const char * str)
     {
-        platform.ui.console("cl1").printf("%s", str);
+        PRINT("%s", str);
     }
 
     void print(const std::string & str)
     {
-        platform.ui.console("cl1").printf("%s", str.c_str());
+        PRINT("%s", str.c_str());
     }
 
     void print(int val)
     {
-        platform.ui.console("cl1").printf("%d", val);
+        PRINT("%d", val);
     }
 
     void print(long unsigned int val)
     {
-        platform.ui.console("cl1").printf("%u", val);
+        PRINT("%u", val);
+    }
+
+    void print(unsigned int val)
+    {
+        PRINT("%u", val);
     }
 
     void print(double val)
     {
-        platform.ui.console("cl1").printf("%f", val);
+        PRINT("%f", val);
     }
 
     void clear()
@@ -45,6 +62,6 @@ SerialDisplay& operator<< (SerialDisplay& serial, T&& string_to_print)
     return serial;
 }
 
-const char newline[] = "\n";
+const char newline[] = "\r\n";
 
 #endif //ROBOCOREPRINTERFRONT_SERIALDISPLAY_H

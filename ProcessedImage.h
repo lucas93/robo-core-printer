@@ -2,10 +2,13 @@
 #define ROBOCOREPRINTERFRONT_IMAGE_H
 
 #include "Row.h"
+
+
 #include <fstream>
 
 using ProcessedImage = std::vector<Row>;
 
+#ifndef __ISENSOR_H__
 ostream & operator<<(ostream & ostr, const ProcessedImage & image)
 {
     ostr << image.size() << "\n";
@@ -15,57 +18,104 @@ ostream & operator<<(ostream & ostr, const ProcessedImage & image)
     }
     return ostr;
 }
+#endif // #ifndef __ISENSOR_H__
+
+#ifdef __ISENSOR_H__
+
+#include "SDCardReader.h"
+#include "SerialDisplay.h"
+
+template<>
+SerialDisplay& operator<< (SerialDisplay& serial, const ProcessedImage & image)
+{
+    serial << image.size() << "\n";
+    for(const auto& row : image)
+    {
+        serial << row << "\n";
+    }
+    return serial;
+}
+
+#endif // #ifdef __ISENSOR_H__
 
 class ProcessedImageManager
 {
 private:
     fstream textFile;
+    #ifdef __ISENSOR_H__
+    SDCardReader sdReader;
+    #endif // #ifdef __ISENSOR_H__
 
 public:
-    void saveProcessedImageTextToFile(const ProcessedImage &img, string &filename)
+
+    ProcessedImage loadProcessedImageFromSD(const string &filename)
     {
-        ofstream file;
-        file.open(filename.c_str());
-        file << img;
-        file.close();
+        #ifdef __ISENSOR_H__
+        int MAX_WIDTH = sdReader.parseInt();
+        int MAX_HEIGHT = sdReader.parseInt();
+
+        int height = sdReader.parseInt();
+        ProcessedImage result(height);
+        for(auto & row : result)
+            row = getRowFromSD();
+
+        return result;
+        #endif // #ifdef __ISENSOR_H__
     }
 
-    ProcessedImage getProcessedImageFromSD(string &filename)
+    ProcessedImage loadProcessedImageFromTextFile(string &filename)
     {
-        // TODO
-        return ProcessedImage();
-    }
-
-    ProcessedImage getProcessedImageFromTextFile(string &filename)
-    {
-        auto img = ProcessedImage();
         textFile.open(filename.c_str());
 
-        int numberOfRows;
-        textFile >> numberOfRows;
-        img.reserve(numberOfRows);
+        int HEIGHT_MAX, WIDTH_MAX, numberOfRows;
 
-        for (int i = 0; i < numberOfRows; ++i)
-        {
-            img.push_back(getRow());
-        }
+//        int numberOfCharactersInFile;
+//        textFile >> numberOfCharactersInFile;
+
+        textFile >> HEIGHT_MAX;
+        textFile >> WIDTH_MAX;
+
+        textFile >> numberOfRows;
+        auto img = ProcessedImage(numberOfRows);
+
+        for (auto & row : img)
+            row = getRow();
 
         textFile.close();
         return img;
     }
 
 private:
+    #ifdef __ISENSOR_H__
+    Row getRowFromSD()
+    {
+        int numberOfLines = sdReader.parseInt();
+        Row row(numberOfLines);
+
+        for (auto & line : row)
+            line = getLineFromSD();
+
+        return row;
+    }
+
+    Line getLineFromSD()
+    {
+        Line::point_type a = sdReader.parseInt();
+        Line::point_type b = sdReader.parseInt();
+
+        return Line{ a, b };
+    }
+    #endif // #ifdef __ISENSOR_H__
     Row getRow()
     {
-        auto row = Row();
+        int numberOfLines;
+        textFile >> numberOfLines;
 
-        int numberOfPairs;
-        textFile >> numberOfPairs;
-        row.reserve(numberOfPairs);
+        auto row = Row(numberOfLines);
 
-        for (int i = 0; i < numberOfPairs; ++i)
+        for (auto & line : row)
         {
-            row.push_back(getLine());
+            line = getLine();
         }
         return row;
     }
@@ -77,7 +127,7 @@ private:
         textFile >> a;
         textFile >> b;
 
-        return { a, b };
+        return Line{ a, b };
     }
 };
 

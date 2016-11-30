@@ -9,6 +9,7 @@
 #include "SerialDisplay.h"
 #include "ControlButtons.h"
 #include "System.h"
+#include "SDCardReader.h"
 
 using namespace hSensors;
 
@@ -16,14 +17,15 @@ class Printer
 {
 private:
     ProcessedImage image;
-    String imageDataFileName = "imageData.img";
+    String imageDataFileName = "image.txt";
+    SDCardReader sdReader;
 
     RegulatedMotor<2> mX;
     RegulatedMotor<1> mY;
     RegulatedMotor<6> mZ;
-    const int mXSpeed = 200;
-    const int mYSpeed = 80;
-    const int mZSpeed = 600;
+    const int mXSpeed = 50;
+    const int mYSpeed = 50;
+    int mZSpeed = 100;
     Lego_Touch lTouch = Lego_Touch(hSens2);
     Lego_Touch rTouch = Lego_Touch(hSens1);
 
@@ -31,8 +33,8 @@ private:
     int yCurrent = 0;
     const int WIDTH_MAX = 310;
     const int HEIGHT_MAX = 730;
-    int zRotation = 135;
-    int zCalibrationStep = 5;
+    int zRotation = 600;
+    int zCalibrationStep = 40;
     const int xReverseConstant = 46;
 
     bool isXCalibrated = false;
@@ -50,13 +52,11 @@ public:
         mY.setSpeed(mYSpeed);
         mZ.setSpeed(mZSpeed);
         // TODO optional - prepare menu handling
-
-
     }
 
     void start()
     {
-        prepareEV3();
+        preparePrinter();
 
         printImage();
 
@@ -65,13 +65,32 @@ public:
 
 private:
 
-    void prepareEV3()
+    void preparePrinter()
     {
         calibrateY();
         calibrateX();
         calibratePen();
 
         displayCalibrationParameters();
+    }
+
+
+    void calibrateY()
+    {
+        mY.setSpeed(mYSpeed / 2);
+        mY.start();
+        console << "Press any button when Y i calibrated: ";
+
+        ButtonManager::waitForAnyPress();
+
+        mY.stop();
+        mY.setSpeed(mYSpeed);
+        yCurrent = 0;
+    }
+
+    void calibrateX()
+    {
+        // TODO
     }
 
     void printImage()
@@ -89,108 +108,152 @@ private:
         }
     }
 
-    void calibratePen(bool shouldCalibrateX = true)
+    void calibratePen()
     {
         Button button;
 
         do
         {
-            console << "A - amplitude calibrate" << newline
-                   << "P - position calibrate" << newline
+            console << newline << "Calibrating pen:" << newline
+                   << "A - amplitude calibration" << newline
+                   << "P - position calibration" << newline
+                   << "S - speed calibration" << newline
                    << "T - try" << newline
-                   << "ENTER - accept";
+                   << "C - accept" << newline;
 
             button = ButtonManager::waitForAnyPress();
 
             switch (button)
             {
-            case Button::Key_A:
+            case 'a':
                 calibratePenAmplitude();
                 break;
 
-            case Button::Key_P:
+            case 'p':
                 calibratePenPosition();
                 break;
+            case 's':
+                calibratePenSpeed();
+                break;
 
-            case Button::Key_T:
+            case 't':
                 penTest();
                 break;
             }
-        } while(button != Button::Enter);
+        } while(button != 'c');
     }
 
     void calibratePenAmplitude()
     {
         Button button;
-
+        console << newline << "Calibrating pen amplitude:" << newline
+               << "Q - top higher" << newline
+               << "A - top lower" << newline
+               << "E - down higher" << newline
+               << "D - down lower" << newline
+               << "T - try" << newline
+               << "C - accept" << newline << newline;
         do
         {
-            console << "Q - top higher" << newline
-                   << "A - top lower" << newline
-                   << "E - down higher" << newline
-                   << "D - down lower" << newline
-                   << "T - try" << newline
-                   << "ENTER - accept";
-
             button = ButtonManager::waitForAnyPress();
 
             switch (button)
             {
-                case Button::Key_Q:
+                case 'q':
                     zRotation += zCalibrationStep;
                     mZ.rotate(-zCalibrationStep);
                     break;
-                case Button::Key_A:
+                case 'a':
                     zRotation -= zCalibrationStep;
                     mZ.rotate(zCalibrationStep);
                     break;
 
-                case Button::Key_E:
+                case 'e':
                     zRotation -= zCalibrationStep;
                     break;
 
-                case Button::Key_D:
+                case 'd':
                     zRotation += zCalibrationStep;
                     break;
 
-                case Button::Key_T:
+                case 't':
                     penTest();
                     break;
 
                 default:
                     break;
             }
-        } while(button != Button::Enter);
+        } while(button != 'c');
     }
 
     void calibratePenPosition()
     {
         Button button;
+        console << newline << "Calibrating pen position:" << newline
+               << "W - pen higher" << newline
+               << "S - pen lower" << newline
+               << "T - try" << newline
+               << "C - accept" << newline;
 
         do
         {
-            console << "UP - pen higher" << newline
-                   << "DOWN - pen lower" << newline
-                   << "ENTER - accept" << newline
-                   << "T - try";
+            button = ButtonManager::waitForAnyPress();
 
             switch (button)
             {
-                case Button::Up:
-                    mZ.rotate(-zCalibrationStep);
-                    break;
+            case 'w':
+                mZ.rotate(-zCalibrationStep);
+                break;
 
-                case Button::Down:
-                    mZ.rotate(zCalibrationStep);
-                    break;
+            case 's':
+                mZ.rotate(zCalibrationStep);
+                break;
 
-            case Button::Key_T:
+            case 't':
                 penTest();
 
             default:
                 break;
             }
-        } while(button != Button::Enter);
+        } while(button != 'c');
+    }
+    void calibratePenSpeed()
+    {
+        auto constrain = [](int val, int min, int max) -> bool
+        {
+            return (val < min ? min : (val > max ? max : val));
+        };
+
+        Button button;
+        console << newline << "Calibrating pen speed:" << newline
+               << "W - faster" << newline
+               << "S - slower" << newline
+               << "T - try" << newline
+               << "C - accept" << newline;
+
+        do
+        {
+            button = ButtonManager::waitForAnyPress();
+
+            switch (button)
+            {
+            case 'w':
+                mZSpeed = constrain(mZSpeed + 5, 15, 100);
+                mZ.setSpeed(mZSpeed);
+                break;
+
+            case 's':
+                mZSpeed = constrain(mZSpeed - 5, 15, 100);
+                mZ.setSpeed(mZSpeed);
+                break;
+
+            case 't':
+                penTest();
+
+            default:
+                break;
+            }
+        } while(button != 'c');
     }
 
     void penTest()
@@ -260,32 +323,10 @@ private:
         mY.rotate(-distance * PIX_ROTATION, immediateReturn);
     }
 
-    void calibrateX()
-    {
-        // TODO
-    }
-
-    void calibrateY()
-    {
-        const int distance = 10000;
-
-        mY.setSpeed(mYSpeed / 2);
-        mY.rotate(distance * PIX_ROTATION, true);
-
-        while (mY.isMoving())
-        {
-            if(rTouch.isPressed())
-            {
-                mY.stop();
-                mY.setSpeed(mYSpeed);
-                yCurrent = 0;
-            }
-        }
-    }
 
     void pauseButtonPushed()
     {
-        // TODO
+        // TODO
     }
 
     void displayCalibrationParameters()
