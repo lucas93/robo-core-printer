@@ -36,13 +36,12 @@ private:
     int rowsLeft = 0;
     Row currentRow;
 
-    const int WIDTH_MAX = 310;
-    const int HEIGHT_MAX = 730;
+    const int WIDTH_MAX = 220;
+    const int HEIGHT_MAX = 270;
 
     int zRotation = 600;
     int zCalibrationStep = 40;
 
-    int xReverseConstant = 46;    // TODO
     int xDistanceFromBoundry = 1000;    // TODO
 
     bool isXCalibrated = false;
@@ -50,10 +49,10 @@ private:
 
     bool isPauseButtonPushed = false;
 
-    int PIX_ROTATION = 20; // elemental servo rotation for 1 pixel
+    int PIX_ROTATION = 80; // elemental servo rotation for 1 pixel
 
     enum class Direction { toRight, toLeft };
-    Direction currentDirection;
+    Direction directionOfXMovement;
 public:
 
     Printer()
@@ -114,17 +113,17 @@ private:
 
         mX.rotate(xDistanceFromBoundry);
 
-        currentDirection = Direction::toRight;
+        directionOfXMovement = Direction::toRight;
         xCurrent = 0;
 
         console << newline << "Calibrated X axis" << newline;
     }
 
 
+
     void calibratePen()
     {
         Button button;
-
         do
         {
             console << newline << "Calibrating pen:" << newline
@@ -270,28 +269,52 @@ private:
         } while(button != 'c');
     }
 
+    void calibratePenAxisIfKeyPressed()
+    {
+        if(Serial.available() > 0)
+        {
+            char button = ButtonManager::waitForAnyPress();
+
+            if(button == 'c')
+            {
+                calibratePen();
+            }
+        }
+    }
+
     void prepareImage()
     {
        sdReader.prepareSD(imageDataFileName);
        int widthMaxFromFile = sdReader.parseInt();
        int heightMaxFromFile = sdReader.parseInt();
 
-       rowsLeft = sdReader.parseInt();
+       checkImageDimentions (widthMaxFromFile, heightMaxFromFile);
 
+       rowsLeft = sdReader.parseInt();
+    }
+
+    void checkImageDimentions(int width, int height)
+    {
+        if(  widthMaxFromFile != WIDTH_MAX
+           || heightMaxFromFile != HEIGHT_MAX )
+        {
+            while(1)
+            {
+                console << newline << "Image dimentions don't match!!";
+                ButtonManager::waitForAnyPress();
+            }
+        }
     }
 
     void printImage()
     {
-        if (getNextRowIfAvailable() == false)
-            return;
-
-        if(currentRow.size() > 0)
+        while(getNextRowIfAvailable() == true)
         {
             printRow();
-        }
-        else if(currentRow.size() == 0)
-        {
+
             moveY(1);
+
+            calibratePenAxisIfKeyPressed();
         }
 
     }
@@ -309,56 +332,44 @@ private:
 
     void printRow()
     {
-        if(currentDirection == Direction::toRight)
-        {
-            for(auto & line : currentRow)
-            {
-                auto distanceToLine = line.a - xCurrent;
-                auto lineLength = line.length();
+        directionOfXMovement = chooseDirection();
+        Row rowToDraw = currentRow;
 
-                moveX(distanceToLine);
-                PenDown();
-                moveX(lineLength);
-                PenUp();
-            }
-        }
-        else if(currentDirection == Direction::toLeft)
-        {
-            // reverse for(auto & line : currentRow)
-            for(auto & line : reverse(currentRow))
-            {
-                auto distanceToLine = xCurrent - line.b;
-                auto lineLength = line.length();
+        if(directionOfXMovement == Direction::toLeft)
+            rowToDraw = reverse(currentRow);
 
-                moveX(-distanceToLine);
-                PenDown();
-                moveX(-lineLength);
-                PenUp();
-            }
+        for(auto & line : rowToDraw)
+        {
+            auto distance = distanceToLine(line, directionOfXMovement);
+            auto lineLength = line.length();
+
+            moveX(distance);
+            PenDown();
+            moveX(lineLength, directionOfXMovement);
+            PenUp();
         }
-        changeXDirection();
     }
 
-    void changeXDirection()
+    Direction chooseDirection()
     {
-        if(currentDirection == Direction::toLeft)
-        {
-            mX.start(true);
-            while( lTouch.isPressed() == false );
-            mX.stop();
-            mX.rotate(xDistanceFromBoundry);
-            currentDirection = Direction::toRight;
+        auto firstPointInRow = currentRow[0].a;
+        auto lastPointInRow = currentRow[currentRow.size() - 1].b;
 
-        }
-        else if(currentDirection == Direction::toRight)
-        {
-            mX.start(false);
-            while( rTouch.isPressed() == false );
-            mX.stop();
-            mX.rotate(-xDistanceFromBoundry);
-            currentDirection = Direction::toLeft;
-        }
+        auto distanceToFirstPointInRow = abs(xCurrent - firstPointInRow);
+        auto distanceToLastPointInRow = abs(xCurrent - lastPointInRow);
 
+        if(distanceToFirstPointInRow < distanceToLastPointInRow)
+            return Direction::toRight;
+        else
+            return Direction::toLeft;
+    }
+
+    int distanceToLine(const Line line, Direction direction )
+    {
+        if(direction == Direction::toRight)
+            return line.a - xCurrent;
+        else if(direction == Direction::toLeft)
+            return line.b - xCurrent;
     }
 
     void penTest()
@@ -370,17 +381,19 @@ private:
     void PenDown()
     {
         mZ.rotate(zRotation);
+        LED2.toggle();
     }
 
     void PenUp()
     {
         mZ.rotate(-zRotation);
+        LED2.toggle();
     }
 
-    bool moveX(int distance, double speedMultiper = 1.0)
+    bool moveX(int distance, Direction direction = Direction::toRight)
     {
-        if(speedMultiper < 0.0)
-            speedMultiper = -speedMultiper;
+        if (direction == Direction::toLeft)
+            distance = -distance;
 
         if (xCurrent + distance > WIDTH_MAX || xCurrent + distance < 0)
         {
@@ -393,21 +406,10 @@ private:
             while(true);
         }
 
-        mX.setSpeed((int) (mXSpeed * speedMultiper));
-        mX.rotate(distance * PIX_ROTATION, true);
-
-        while (mX.isMoving())
-        {
-            if(rTouch.isPressed() or lTouch.isPressed())
-            {
-                mX.stop();
-                console << newline << "OUT OF BOUNDRIES!";
-                while(true);
-            }
-        }
+        mX.rotate(distance * PIX_ROTATION);
 
         xCurrent += distance;
-        mX.setSpeed(mXSpeed);
+
         return true;
     }
 
@@ -430,14 +432,13 @@ private:
 
     void pauseButtonPushed()
     {
-        // TODO
+        // TODO
     }
 
     void displayCalibrationParameters()
     {
         #define DISP(VAL) console << newline << #VAL " : " << VAL
         DISP(zRotation);
-        DISP(xReverseConstant);
         DISP(xDistanceFromBoundry);
         DISP(PIX_ROTATION);
         #undef DISP

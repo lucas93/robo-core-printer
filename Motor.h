@@ -80,6 +80,8 @@ public:
     void start(bool clockwise = true) const
     {
         motor->stopRegulation();
+        sys.delay(10);
+
         if(reversed)
             clockwise = !clockwise;
 
