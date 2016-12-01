@@ -1,349 +1,107 @@
-#ifndef ROBOCOREPRINTERFRONT_PRINTER_H
-#define ROBOCOREPRINTERFRONT_PRINTER_H
+#ifndef ROBOCOREPRINTERFRONT_MOTOR_H
+#define ROBOCOREPRINTERFRONT_MOTOR_H
 
-#include "ProcessedImage.h"
-#include "Motor.h"
-//#include "TouchSensor.h"
-#include <hFramework.h>
-#include <Lego_Touch.h>
-#include "SerialDisplay.h"
-#include "ControlButtons.h"
-#include "System.h"
-#include "SDCardReader.h"
-
-using namespace hSensors;
-
-class Printer
+template <int motorNumber>
+struct RegulatedMotor
 {
+    static_assert( motorNumber > 0 and motorNumber <= 6  , "Invalid Motor!");
 private:
-    ProcessedImage image;
-    String imageDataFileName = "image.txt";
-    SDCardReader sdReader;
+    using speed_unit = int;
+    using rotation_unit = int32_t;
 
-    RegulatedMotor<2> mX;
-    RegulatedMotor<1> mY;
-    RegulatedMotor<6> mZ;
-    const int mXSpeed = 50;
-    const int mYSpeed = 50;
-    int mZSpeed = 100;
-    Lego_Touch lTouch = Lego_Touch(hSens2);
-    Lego_Touch rTouch = Lego_Touch(hSens1);
+    const speed_unit maxSpeed = 100;
+    const speed_unit minSpeed = 0;
 
-    int xCurrent = 0;
-    int yCurrent = 0;
-    const int WIDTH_MAX = 310;
-    const int HEIGHT_MAX = 730;
-    int zRotation = 600;
-    int zCalibrationStep = 40;
-    const int xReverseConstant = 46;
+    mutable speed_unit speed = 50; // 0 - 100
 
-    bool isXCalibrated = false;
-    bool isYCalibrated = false;
+    decltype(&hMot1) motor;
 
-    bool isPauseButtonPushed = false;
-
-    const int PIX_ROTATION = 20; // elemental servo rotation for 1 pixel
+    bool reversed = false;
 
 public:
+    RegulatedMotor & operator=(const RegulatedMotor&) = delete;
+    RegulatedMotor(const RegulatedMotor&) = delete;
 
-    Printer()
+
+    RegulatedMotor()
     {
-        mX.setSpeed(mXSpeed);
-        mY.setSpeed(mYSpeed);
-        mZ.setSpeed(mZSpeed);
-        // TODO optional - prepare menu handling
-    }
-
-    void start()
-    {
-        preparePrinter();
-
-        printImage();
-
-        console << "\nDone!\n";
-    }
-
-private:
-
-    void preparePrinter()
-    {
-        calibrateY();
-        calibrateX();
-        calibratePen();
-
-        displayCalibrationParameters();
-    }
-
-
-    void calibrateY()
-    {
-        mY.setSpeed(mYSpeed / 2);
-        mY.start();
-        console << "Press any button when Y i calibrated: ";
-
-        ButtonManager::waitForAnyPress();
-
-        mY.stop();
-        mY.setSpeed(mYSpeed);
-        yCurrent = 0;
-    }
-
-    void calibrateX()
-    {
-        // TODO
-    }
-
-    void printImage()
-    {
-        for (auto & r : image)
+        switch(motorNumber)
         {
-            showStats();
-
-            for(auto & p : r)
-            {
-
-            }
-
-            //moveY(1, true);
+        case 1: motor = &hMot1;
+            break;
+        case 2: motor = &hMot2;
+            break;
+        case 3: motor = &hMot3;
+            break;
+        case 4: motor = &hMot4;
+            break;
+        case 5: motor = &hMot5;
+            break;
+        case 6: motor = &hMot6;
+            break;
         }
     }
 
-    void calibratePen()
+    void setSpeed(const int speed_) const
     {
-        Button button;
-
-        do
-        {
-            console << newline << "Calibrating pen:" << newline
-                   << "A - amplitude calibration" << newline
-                   << "P - position calibration" << newline
-                   << "S - speed calibration" << newline
-                   << "T - try" << newline
-                   << "C - accept" << newline;
-
-            button = ButtonManager::waitForAnyPress();
-
-            switch (button)
-            {
-            case 'a':
-                calibratePenAmplitude();
-                break;
-
-            case 'p':
-                calibratePenPosition();
-                break;
-            case 's':
-                calibratePenSpeed();
-                break;
-
-            case 't':
-                penTest();
-                break;
-            }
-        } while(button != 'c');
+        if (speed_ > maxSpeed)
+            speed = maxSpeed;
+        else if (speed_ < minSpeed)
+            speed = minSpeed;
+        else
+            speed = speed_;
     }
 
-    void calibratePenAmplitude()
+    int getSpeed() const { return speed; }
+
+    void rotate(rotation_unit rotation, bool immediateReturn = false) const
     {
-        Button button;
-        console << newline << "Calibrating pen amplitude:" << newline
-               << "Q - top higher" << newline
-               << "A - top lower" << newline
-               << "E - down higher" << newline
-               << "D - down lower" << newline
-               << "T - try" << newline
-               << "C - accept" << newline << newline;
-        do
-        {
-            button = ButtonManager::waitForAnyPress();
+        if(reversed)
+            rotation = -rotation;
 
-            switch (button)
-            {
-                case 'q':
-                    zRotation += zCalibrationStep;
-                    mZ.rotate(-zCalibrationStep);
-                    break;
-                case 'a':
-                    zRotation -= zCalibrationStep;
-                    mZ.rotate(zCalibrationStep);
-                    break;
-
-                case 'e':
-                    zRotation -= zCalibrationStep;
-                    break;
-
-                case 'd':
-                    zRotation += zCalibrationStep;
-                    break;
-
-                case 't':
-                    penTest();
-                    break;
-
-                default:
-                    break;
-            }
-        } while(button != 'c');
+        motor->rotRel(rotation, speed * 10, !immediateReturn);
     }
 
-    void calibratePenPosition()
+    bool isMoving(const int testDelayMS = 20) const
     {
-        Button button;
-        console << newline << "Calibrating pen position:" << newline
-               << "W - pen higher" << newline
-               << "S - pen lower" << newline
-               << "T - try" << newline
-               << "C - accept" << newline;
+        auto count1 = getEncoderCnt();
+        sys.delay(testDelayMS);
 
-        do
-        {
-            button = ButtonManager::waitForAnyPress();
+        auto count2 = getEncoderCnt();
 
-            switch (button)
-            {
-            case 'w':
-                mZ.rotate(-zCalibrationStep);
-                break;
-
-            case 's':
-                mZ.rotate(zCalibrationStep);
-                break;
-
-            case 't':
-                penTest();
-
-            default:
-                break;
-            }
-        } while(button != 'c');
-    }
-    void calibratePenSpeed()
-    {
-        auto constrain = [](int val, int min, int max) -> bool
-        {
-            return (val < min ? min : (val > max ? max : val));
-        };
-
-        Button button;
-        console << newline << "Calibrating pen speed:" << newline
-               << "W - faster" << newline
-               << "S - slower" << newline
-               << "T - try" << newline
-               << "C - accept" << newline;
-
-        do
-        {
-            button = ButtonManager::waitForAnyPress();
-
-            switch (button)
-            {
-            case 'w':
-                mZSpeed = constrain(mZSpeed + 5, 15, 100);
-                mZ.setSpeed(mZSpeed);
-                break;
-
-            case 's':
-                mZSpeed = constrain(mZSpeed - 5, 15, 100);
-                mZ.setSpeed(mZSpeed);
-                break;
-
-            case 't':
-                penTest();
-
-            default:
-                break;
-            }
-        } while(button != 'c');
+        return count1 != count2;
     }
 
-    void penTest()
+    auto getEncoderCnt() const
     {
-        PenDown();
-        PenUp();
+        return motor->getEncoderCnt();
     }
 
-    void PenDown()
+    void start(bool clockwise = true) const
     {
-        mZ.rotate(zRotation);
+        motor->stopRegulation();
+        if(reversed)
+            clockwise = !clockwise;
+
+        if(clockwise)
+            motor->setPower(-speed * 10);
+        else
+            motor->setPower(speed * 10);
+    }
+    void stop() const
+    {
+        motor->stop();
     }
 
-    void PenUp()
+    void inversePolarity()
     {
-        mZ.rotate(-zRotation);
+        reversed = !reversed;
     }
 
-    bool moveX(int distance, double speedMultiper = 1.0)
+    void setReversedPolarity(bool reversed_)
     {
-        if(speedMultiper < 0.0)
-            speedMultiper = -speedMultiper;
-
-        if (xCurrent + distance > WIDTH_MAX || xCurrent + distance < 0)
-        {
-            console << "WIDTH_MAX reached!" << newline
-                   << "xCurrent = " << xCurrent << newline
-                   <<  "distance = " << distance << newline;
-
-            syst.waitMS(2000);
-
-            while(true);
-        }
-
-        mX.setSpeed((int) (mXSpeed * speedMultiper));
-        mX.rotate(distance * PIX_ROTATION, true);
-
-        while (mX.isMoving())
-        {
-            if(rTouch.isPressed() or lTouch.isPressed())
-            {
-                mX.stop();
-                console << "OUT OF BOUNDRIES!";
-                while(true);
-            }
-        }
-
-        xCurrent += distance;
-        mX.setSpeed(mXSpeed);
-        return true;
-    }
-
-    void moveY(int distance, bool immediateReturn = false)
-    {
-        if (yCurrent + distance > HEIGHT_MAX || yCurrent + distance < 0)
-        {
-            console << "WIDTH_MAX reached!" << newline
-                   << "xCurrent = " << xCurrent << newline
-                   <<  "distance = " << distance << newline;
-
-            syst.waitMS(2000);
-
-            while(true);
-        }
-
-        yCurrent += distance;
-        mY.rotate(-distance * PIX_ROTATION, immediateReturn);
-    }
-
-
-    void pauseButtonPushed()
-    {
-        // TODO
-    }
-
-    void displayCalibrationParameters()
-    {
-        console << "zRotation = " << zRotation;
-    }
-
-    void showStats()
-    {
-
-    }
-
-    void loadImage()
-    {
-        console << "Loaded image data";
-        // TODO
+        reversed = reversed_;
     }
 };
 
-#endif //ROBOCOREPRINTERFRONT_PRINTER_H
+#endif //ROBOCOREPRINTERFRONT_MOTOR_H

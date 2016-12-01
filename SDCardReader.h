@@ -6,6 +6,7 @@
 #include <string>
 
 #include "SerialDisplay.h"
+#include "Row.h"
 
 using namespace std;
 
@@ -30,6 +31,25 @@ struct SDCardReader
     {
         if( !prepared )
             prepareSD();
+    }
+
+    Row parseRow()
+    {
+        int numberOfLines = parseInt();
+        Row row(numberOfLines);
+
+        for(auto & line : row)
+            line = parseLine();
+
+        return row;
+    }
+
+    Line parseLine()
+    {
+        Line::point_type a = parseInt();
+        Line::point_type b = parseInt();
+
+        return Line{ a, b };
     }
 
     Int parseInt()
@@ -57,7 +77,6 @@ struct SDCardReader
         else
             return 0;
     }
-
 
 
     void mountSD()

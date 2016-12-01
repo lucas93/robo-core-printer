@@ -1,6 +1,8 @@
 #ifndef ROBOCOREPRINTERFRONT_PRINTER_H
 #define ROBOCOREPRINTERFRONT_PRINTER_H
 
+#include <algorithm>
+#include <iterator>
 #include "ProcessedImage.h"
 #include "Motor.h"
 //#include "TouchSensor.h"
@@ -23,27 +25,35 @@ private:
     RegulatedMotor<2> mX;
     RegulatedMotor<1> mY;
     RegulatedMotor<6> mZ;
-    const int mXSpeed = 50;
+    const int mXSpeed = 80;
     const int mYSpeed = 50;
     int mZSpeed = 100;
-    Lego_Touch lTouch = Lego_Touch(hSens2);
-    Lego_Touch rTouch = Lego_Touch(hSens1);
+    Lego_Touch rTouch = Lego_Touch(hSens2);
+    Lego_Touch lTouch = Lego_Touch(hSens1);
 
     int xCurrent = 0;
     int yCurrent = 0;
+    int rowsLeft = 0;
+    Row currentRow;
+
     const int WIDTH_MAX = 310;
     const int HEIGHT_MAX = 730;
+
     int zRotation = 600;
     int zCalibrationStep = 40;
-    const int xReverseConstant = 46;
+
+    int xReverseConstant = 46;    // TODO
+    int xDistanceFromBoundry = 1000;    // TODO
 
     bool isXCalibrated = false;
     bool isYCalibrated = false;
 
     bool isPauseButtonPushed = false;
 
-    const int PIX_ROTATION = 20; // elemental servo rotation for 1 pixel
+    int PIX_ROTATION = 20; // elemental servo rotation for 1 pixel
 
+    enum class Direction { toRight, toLeft };
+    Direction currentDirection;
 public:
 
     Printer()
@@ -51,16 +61,20 @@ public:
         mX.setSpeed(mXSpeed);
         mY.setSpeed(mYSpeed);
         mZ.setSpeed(mZSpeed);
-        // TODO optional - prepare menu handling
+
+        mX.setReversedPolarity(true);
     }
 
     void start()
     {
+        console << newline << "Press any key to start: " << newline;
+        ButtonManager::waitForAnyPress();
+
         preparePrinter();
 
         printImage();
 
-        console << "\nDone!\n";
+        console << newline << "Done!";
     }
 
 private:
@@ -70,6 +84,8 @@ private:
         calibrateY();
         calibrateX();
         calibratePen();
+
+        prepareImage();
 
         displayCalibrationParameters();
     }
@@ -86,27 +102,24 @@ private:
         mY.stop();
         mY.setSpeed(mYSpeed);
         yCurrent = 0;
+
+        console << newline << "Calibrated Y axis" << newline;
     }
 
     void calibrateX()
     {
-        // TODO
+        mX.start(true);
+        while (lTouch.isPressed() == false);
+        mX.stop();
+
+        mX.rotate(xDistanceFromBoundry);
+
+        currentDirection = Direction::toRight;
+        xCurrent = 0;
+
+        console << newline << "Calibrated X axis" << newline;
     }
 
-    void printImage()
-    {
-        for (auto & r : image)
-        {
-            showStats();
-
-            for(auto & p : r)
-            {
-
-            }
-
-            //moveY(1, true);
-        }
-    }
 
     void calibratePen()
     {
@@ -141,6 +154,7 @@ private:
                 break;
             }
         } while(button != 'c');
+        console << newline << "Calibrated pen Z axis" << newline;
     }
 
     void calibratePenAmplitude()
@@ -256,6 +270,97 @@ private:
         } while(button != 'c');
     }
 
+    void prepareImage()
+    {
+       sdReader.prepareSD(imageDataFileName);
+       int widthMaxFromFile = sdReader.parseInt();
+       int heightMaxFromFile = sdReader.parseInt();
+
+       rowsLeft = sdReader.parseInt();
+
+    }
+
+    void printImage()
+    {
+        if (getNextRowIfAvailable() == false)
+            return;
+
+        if(currentRow.size() > 0)
+        {
+            printRow();
+        }
+        else if(currentRow.size() == 0)
+        {
+            moveY(1);
+        }
+
+    }
+
+    bool getNextRowIfAvailable()
+    {
+        if (rowsLeft > 0)
+        {
+            --rowsLeft;
+            currentRow = sdReader.parseRow();
+            return true;
+        }
+        return false;
+    }
+
+    void printRow()
+    {
+        if(currentDirection == Direction::toRight)
+        {
+            for(auto & line : currentRow)
+            {
+                auto distanceToLine = line.a - xCurrent;
+                auto lineLength = line.length();
+
+                moveX(distanceToLine);
+                PenDown();
+                moveX(lineLength);
+                PenUp();
+            }
+        }
+        else if(currentDirection == Direction::toLeft)
+        {
+            // reverse for(auto & line : currentRow)
+            for(auto & line : reverse(currentRow))
+            {
+                auto distanceToLine = xCurrent - line.b;
+                auto lineLength = line.length();
+
+                moveX(-distanceToLine);
+                PenDown();
+                moveX(-lineLength);
+                PenUp();
+            }
+        }
+        changeXDirection();
+    }
+
+    void changeXDirection()
+    {
+        if(currentDirection == Direction::toLeft)
+        {
+            mX.start(true);
+            while( lTouch.isPressed() == false );
+            mX.stop();
+            mX.rotate(xDistanceFromBoundry);
+            currentDirection = Direction::toRight;
+
+        }
+        else if(currentDirection == Direction::toRight)
+        {
+            mX.start(false);
+            while( rTouch.isPressed() == false );
+            mX.stop();
+            mX.rotate(-xDistanceFromBoundry);
+            currentDirection = Direction::toLeft;
+        }
+
+    }
+
     void penTest()
     {
         PenDown();
@@ -296,7 +401,7 @@ private:
             if(rTouch.isPressed() or lTouch.isPressed())
             {
                 mX.stop();
-                console << "OUT OF BOUNDRIES!";
+                console << newline << "OUT OF BOUNDRIES!";
                 while(true);
             }
         }
@@ -323,7 +428,6 @@ private:
         mY.rotate(-distance * PIX_ROTATION, immediateReturn);
     }
 
-
     void pauseButtonPushed()
     {
         // TODO
@@ -331,18 +435,17 @@ private:
 
     void displayCalibrationParameters()
     {
-        console << "zRotation = " << zRotation;
+        #define DISP(VAL) console << newline << #VAL " : " << VAL
+        DISP(zRotation);
+        DISP(xReverseConstant);
+        DISP(xDistanceFromBoundry);
+        DISP(PIX_ROTATION);
+        #undef DISP
     }
 
     void showStats()
     {
-
-    }
-
-    void loadImage()
-    {
-        console << "Loaded image data";
-        // TODO
+        console << newline << "Rows left to print: " << rowsLeft;
     }
 };
 

@@ -3,6 +3,8 @@
 
 
 #include <string>
+#include <vector>
+#include "ProcessedImage.h"
 
 #ifdef __HCLOUDCLIENT_H__
 
@@ -34,6 +36,11 @@ struct SerialDisplay
         PRINT("%d", val);
     }
 
+    void print(long int val)
+    {
+        PRINT("%d", val);
+    }
+
     void print(long unsigned int val)
     {
         PRINT("%u", val);
@@ -49,11 +56,36 @@ struct SerialDisplay
         PRINT("%f", val);
     }
 
+    void print(ProcessedImage image)
+    {
+        print(image.size());
+        print(" ");
+        for(const auto& row : image)
+            print(row);
+    }
+
+    void print(Row row)
+    {
+        print(row.size());
+        print(" ");
+        for(const auto& line : row)
+            print(line);
+    }
+
+    void print(Line line)
+    {
+        print(line.a);
+        print(" ");
+        print(line.b);
+        print(" ");
+    }
+
     void clear()
     {
 
     }
 } console;
+
 
 template <typename T>
 SerialDisplay& operator<< (SerialDisplay& serial, T&& string_to_print)
