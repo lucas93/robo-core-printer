@@ -24,7 +24,6 @@ ostream & operator<<(ostream & ostr, const ProcessedImage & image)
 
 #include "SDCardReader.h"
 
-
 #endif // #ifdef __ISENSOR_H__
 
 // returns reversed vector

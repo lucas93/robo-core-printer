@@ -18,7 +18,7 @@ using namespace hSensors;
 class Printer
 {
 private:
-    ProcessedImage image;
+    ConvertedImage image;
     String imageDataFileName = "image.txt";
     SDCardReader sdReader;
 

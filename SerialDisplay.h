@@ -56,7 +56,7 @@ struct SerialDisplay
         PRINT("%f", val);
     }
 
-    void print(ProcessedImage image)
+    void print(ConvertedImage image)
     {
         print(image.size());
         print(" ");
