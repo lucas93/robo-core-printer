@@ -23,7 +23,7 @@ private:
     RegulatedMotor<1> mY;
     RegulatedMotor<6> mZ;
     const int mXSpeed = 80;
-    const int mYSpeed = 50;
+    const int mYSpeed = 30;
     int mZSpeed = 100;
     Lego_Touch rTouch = Lego_Touch(hSens2);
     Lego_Touch lTouch = Lego_Touch(hSens1);
@@ -37,12 +37,9 @@ private:
     const int HEIGHT_MAX = 270;
 
     int zRotation = 600;
-    int zCalibrationStep = 40;
+    int zCalibrationStep = 20;
 
-    int xDistanceFromBoundryAterCalibration = 1000;    // TODO
-
-    bool isXCalibrated = false;
-    bool isYCalibrated = false;
+    int xDistanceFromBoundryAterCalibration = 1000;
 
     bool isPauseButtonPushed = false;
 
@@ -66,7 +63,7 @@ private:
 
         void calibratePen()
         {
-            Button button;
+            char key;
             do
             {
                 console << newline << "Calibrating pen:" << newline
@@ -76,9 +73,9 @@ private:
                        << "T - try" << newline
                        << "C - accept" << newline;
 
-                button = Serial.getch();
+                key = Serial.getch();
 
-                switch (button)
+                switch (key)
                 {
                 case 'a':
                     calibratePenAmplitude();
@@ -95,7 +92,7 @@ private:
                     penTest();
                     break;
                 }
-            } while(button != 'c');
+            } while(key != 'c');
             console << newline << "Calibrated pen Z axis" << newline;
         }
 
@@ -104,7 +101,7 @@ private:
         {
             p->mY.setSpeed(p->mYSpeed / 2);
             p->mY.start();
-            console << "Press any button when Y i calibrated: ";
+            console << "Press any key when Y i calibrated: ";
 
             Serial.getch();
 
@@ -132,7 +129,7 @@ private:
 
         void calibratePenAmplitude()
         {
-            Button button;
+            char key;
             console << newline << "Calibrating pen amplitude:" << newline
                    << "Q - top higher" << newline
                    << "A - top lower" << newline
@@ -142,9 +139,9 @@ private:
                    << "C - accept" << newline << newline;
             do
             {
-                button = Serial.getch();
+                key = Serial.getch();
 
-                switch (button)
+                switch (key)
                 {
                     case 'q':
                         p->zRotation += p->zCalibrationStep;
@@ -170,12 +167,12 @@ private:
                     default:
                         break;
                 }
-            } while(button != 'c');
+            } while(key != 'c');
         }
 
         void calibratePenPosition()
         {
-            Button button;
+            char key;
             console << newline << "Calibrating pen position:" << newline
                    << "W - pen higher" << newline
                    << "S - pen lower" << newline
@@ -184,9 +181,9 @@ private:
 
             do
             {
-                button = Serial.getch();
+                key = Serial.getch();
 
-                switch (button)
+                switch (key)
                 {
                 case 'w':
                     p->mZ.rotate(-p->zCalibrationStep);
@@ -202,7 +199,7 @@ private:
                 default:
                     break;
                 }
-            } while(button != 'c');
+            } while(key != 'c');
         }
         void calibratePenSpeed()
         {
@@ -211,7 +208,7 @@ private:
                 return (val < min ? min : (val > max ? max : val));
             };
 
-            Button button;
+            char key;
             console << newline << "Calibrating pen speed:" << newline
                    << "W - faster" << newline
                    << "S - slower" << newline
@@ -220,9 +217,9 @@ private:
 
             do
             {
-                button = Serial.getch();
+                key = Serial.getch();
 
-                switch (button)
+                switch (key)
                 {
                 case 'w':
                     p->mZSpeed = constrain(p->mZSpeed + 5, 15, 100);
@@ -240,7 +237,7 @@ private:
                 default:
                     break;
                 }
-            } while(button != 'c');
+            } while(key != 'c');
         }
 
         void penTest()
@@ -323,9 +320,9 @@ private:
     {
         if(Serial.available() > 0)
         {
-            char button = Serial.getch();
+            char key = Serial.getch();
 
-            if(button == 'c')
+            if(key == 'c')
             {
                 calibrator.calibratePen();
             }
