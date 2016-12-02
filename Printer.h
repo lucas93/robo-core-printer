@@ -9,7 +9,6 @@
 #include <hFramework.h>
 #include <Lego_Touch.h>
 #include "SerialDisplay.h"
-#include "ControlButtons.h"
 #include "SDCardReader.h"
 
 using namespace hSensors;
@@ -78,7 +77,7 @@ private:
                        << "T - try" << newline
                        << "C - accept" << newline;
 
-                button = ButtonManager::waitForAnyPress();
+                button = Serial.getch();
 
                 switch (button)
                 {
@@ -108,7 +107,7 @@ private:
             p->mY.start();
             console << "Press any button when Y i calibrated: ";
 
-            ButtonManager::waitForAnyPress();
+            Serial.getch();
 
             p->mY.stop();
             p->mY.setSpeed(p->mYSpeed);
@@ -144,7 +143,7 @@ private:
                    << "C - accept" << newline << newline;
             do
             {
-                button = ButtonManager::waitForAnyPress();
+                button = Serial.getch();
 
                 switch (button)
                 {
@@ -186,7 +185,7 @@ private:
 
             do
             {
-                button = ButtonManager::waitForAnyPress();
+                button = Serial.getch();
 
                 switch (button)
                 {
@@ -222,7 +221,7 @@ private:
 
             do
             {
-                button = ButtonManager::waitForAnyPress();
+                button = Serial.getch();
 
                 switch (button)
                 {
@@ -279,7 +278,7 @@ private:
                 while(1)
                 {
                     console << newline << "Image dimentions don't match!!";
-                    ButtonManager::waitForAnyPress();
+                    Serial.getch();
                 }
             }
         }
@@ -302,7 +301,7 @@ public:
     void start()
     {
         console << newline << "Press s key to start: " << newline;
-        ButtonManager::waitForAnyPress();
+        Serial.getch();
 
         preparePrinter();
 
@@ -325,7 +324,7 @@ private:
     {
         if(Serial.available() > 0)
         {
-            char button = ButtonManager::waitForAnyPress();
+            char button = Serial.getch();
 
             if(button == 'c')
             {
