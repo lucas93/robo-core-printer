@@ -12,11 +12,19 @@ using namespace std;
 
 
 
-struct SDCardReader
+class SDCardReader
 {
     using Int = int16_t ;
     hFile file;
     bool prepared = false;
+
+public:
+    SDCardReader() = default;
+    ~SDCardReader()
+    {
+        closeFile();
+        unmountSD();
+    }
 
     void prepareSD(const string& RoboCoreImageFileName = "image.txt")
     {
@@ -25,12 +33,6 @@ struct SDCardReader
 
 
         prepared = true;
-    }
-
-    void prepareIfNotPrepared()
-    {
-        if( !prepared )
-            prepareSD();
     }
 
     Row parseRow()
@@ -44,6 +46,29 @@ struct SDCardReader
         return row;
     }
 
+    Int parseInt()
+    {
+        prepareIfNotPrepared();
+
+        string strNum;
+        char ch = getSingleCharFromSD();
+        while( isdigit(ch) )
+        {
+            strNum += ch;
+            ch = getSingleCharFromSD();
+        }
+
+        return std::atoi(strNum.c_str());
+    }
+
+private:
+
+    void prepareIfNotPrepared()
+    {
+        if( !prepared )
+            prepareSD();
+    }
+
     Line parseLine()
     {
         Line::point_type a = parseInt();
@@ -52,23 +77,7 @@ struct SDCardReader
         return Line{ a, b };
     }
 
-    Int parseInt()
-    {
-        prepareIfNotPrepared();
-
-        string strNum;
-        char ch = getChar();
-        while( isdigit(ch) )
-        {
-            strNum += ch;
-            ch = getChar();
-        }
-
-        return std::atoi(strNum.c_str());
-    }
-
-
-    char getChar()
+    char getSingleCharFromSD()
     {
         char d[1];
         int r = file.read(d, 1);
@@ -77,7 +86,6 @@ struct SDCardReader
         else
             return 0;
     }
-
 
     void mountSD()
     {
