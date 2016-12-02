@@ -1,7 +1,17 @@
-#include <iostream>
+#include "hFramework.h"
+#include "SerialDisplay.h"
+#include "ConvertedImage.h"
+
 #include "Printer.h"
 
-int main() {
-    std::cout << "Hello, World!" << std::endl;
-    return 0;
+void hMain()
+{
+    while (1)
+    {
+        LED1.toggle();
+
+        Printer printer;
+
+        printer.start();
+    }
 }
