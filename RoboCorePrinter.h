@@ -1,18 +1,18 @@
-#ifndef ROBOCOREPRINTERFRONT_PRINTER_H
-#define ROBOCOREPRINTERFRONT_PRINTER_H
+#ifndef ROBOCOREPRINTERFRONT_ROBOCOREPRINTER_H
+#define ROBOCOREPRINTERFRONT_ROBOCOREPRINTER_H
 
+#include <hFramework.h>
 #include <algorithm>
 #include <iterator>
 #include "ConvertedImage.h"
 #include "Motor.h"
-#include <hFramework.h>
 #include <Lego_Touch.h>
 #include "SerialDisplay.h"
 #include "SDCardReader.h"
 
 using namespace hSensors;
 
-class Printer
+class RoboCorePrinter
 {
 private:
     ConvertedImage image;
@@ -50,9 +50,9 @@ private:
 
     class Calibrator
     {
-        Printer* p;
+        RoboCorePrinter* p;
     public:
-        Calibrator(Printer* parent) : p(parent) {}
+        Calibrator(RoboCorePrinter* parent) : p(parent) {}
 
         void calibratePrinter()
         {
@@ -249,10 +249,10 @@ private:
 
     class ImagePreparer
     {
-        Printer *p;
+        RoboCorePrinter *p;
 
     public:
-        ImagePreparer(Printer* parent) : p(parent) {}
+        ImagePreparer(RoboCorePrinter* parent) : p(parent) {}
 
         void prepareImage()
         {
@@ -285,7 +285,7 @@ private:
 
 public:
 
-    Printer()
+    RoboCorePrinter()
     {
         mX.setSpeed(mXSpeed);
         mY.setSpeed(mYSpeed);
@@ -462,4 +462,4 @@ private:
     }
 };
 
-#endif //ROBOCOREPRINTERFRONT_PRINTER_H
+#endif //ROBOCOREPRINTERFRONT_ROBOCOREPRINTER_H

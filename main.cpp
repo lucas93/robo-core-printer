@@ -10,7 +10,7 @@ void hMain()
     {
         LED1.toggle();
 
-        Printer printer;
+        RoboCorePrinter printer;
 
         printer.start();
     }
