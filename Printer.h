@@ -5,7 +5,6 @@
 #include <iterator>
 #include "ConvertedImage.h"
 #include "Motor.h"
-//#include "TouchSensor.h"
 #include <hFramework.h>
 #include <Lego_Touch.h>
 #include "SerialDisplay.h"
