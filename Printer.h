@@ -3,14 +3,13 @@
 
 #include <algorithm>
 #include <iterator>
-#include "ProcessedImage.h"
+#include "ConvertedImage.h"
 #include "Motor.h"
 //#include "TouchSensor.h"
 #include <hFramework.h>
 #include <Lego_Touch.h>
 #include "SerialDisplay.h"
 #include "ControlButtons.h"
-#include "System.h"
 #include "SDCardReader.h"
 
 using namespace hSensors;
@@ -42,17 +41,253 @@ private:
     int zRotation = 600;
     int zCalibrationStep = 40;
 
-    int xDistanceFromBoundry = 1000;    // TODO
+    int xDistanceFromBoundryAterCalibration = 1000;    // TODO
 
     bool isXCalibrated = false;
     bool isYCalibrated = false;
 
     bool isPauseButtonPushed = false;
 
-    int PIX_ROTATION = 80; // elemental servo rotation for 1 pixel
+    int ROTATION_PER_PIXEL = 80; // elemental servo rotation for 1 pixel
 
     enum class Direction { toRight, toLeft };
     Direction directionOfXMovement;
+
+    class Calibrator
+    {
+        Printer* p;
+    public:
+        Calibrator(Printer* parent) : p(parent) {}
+
+        void calibratePrinter()
+        {
+            calibrateY();
+            calibrateX();
+            calibratePen();
+        }
+
+        void calibratePen()
+        {
+            Button button;
+            do
+            {
+                console << newline << "Calibrating pen:" << newline
+                       << "A - amplitude calibration" << newline
+                       << "P - position calibration" << newline
+                       << "S - speed calibration" << newline
+                       << "T - try" << newline
+                       << "C - accept" << newline;
+
+                button = ButtonManager::waitForAnyPress();
+
+                switch (button)
+                {
+                case 'a':
+                    calibratePenAmplitude();
+                    break;
+
+                case 'p':
+                    calibratePenPosition();
+                    break;
+                case 's':
+                    calibratePenSpeed();
+                    break;
+
+                case 't':
+                    penTest();
+                    break;
+                }
+            } while(button != 'c');
+            console << newline << "Calibrated pen Z axis" << newline;
+        }
+
+    private:
+        void calibrateY()
+        {
+            p->mY.setSpeed(p->mYSpeed / 2);
+            p->mY.start();
+            console << "Press any button when Y i calibrated: ";
+
+            ButtonManager::waitForAnyPress();
+
+            p->mY.stop();
+            p->mY.setSpeed(p->mYSpeed);
+            p->yCurrent = 0;
+
+            console << newline << "Calibrated Y axis" << newline;
+        }
+
+        void calibrateX()
+        {
+            p->mX.start(true);
+            while (p->lTouch.isPressed() == false);
+            p->mX.stop();
+
+            p->mX.rotate(p->xDistanceFromBoundryAterCalibration);
+
+            p->directionOfXMovement = Direction::toRight;
+            p->xCurrent = 0;
+
+            console << newline << "Calibrated X axis" << newline;
+        }
+
+
+        void calibratePenAmplitude()
+        {
+            Button button;
+            console << newline << "Calibrating pen amplitude:" << newline
+                   << "Q - top higher" << newline
+                   << "A - top lower" << newline
+                   << "E - down higher" << newline
+                   << "D - down lower" << newline
+                   << "T - try" << newline
+                   << "C - accept" << newline << newline;
+            do
+            {
+                button = ButtonManager::waitForAnyPress();
+
+                switch (button)
+                {
+                    case 'q':
+                        p->zRotation += p->zCalibrationStep;
+                        p->mZ.rotate(-p->zCalibrationStep);
+                        break;
+                    case 'a':
+                        p->zRotation -= p->zCalibrationStep;
+                        p->mZ.rotate(p->zCalibrationStep);
+                        break;
+
+                    case 'e':
+                        p->zRotation -= p->zCalibrationStep;
+                        break;
+
+                    case 'd':
+                        p->zRotation += p->zCalibrationStep;
+                        break;
+
+                    case 't':
+                        penTest();
+                        break;
+
+                    default:
+                        break;
+                }
+            } while(button != 'c');
+        }
+
+        void calibratePenPosition()
+        {
+            Button button;
+            console << newline << "Calibrating pen position:" << newline
+                   << "W - pen higher" << newline
+                   << "S - pen lower" << newline
+                   << "T - try" << newline
+                   << "C - accept" << newline;
+
+            do
+            {
+                button = ButtonManager::waitForAnyPress();
+
+                switch (button)
+                {
+                case 'w':
+                    p->mZ.rotate(-p->zCalibrationStep);
+                    break;
+
+                case 's':
+                   p-> mZ.rotate(p->zCalibrationStep);
+                    break;
+
+                case 't':
+                    penTest();
+
+                default:
+                    break;
+                }
+            } while(button != 'c');
+        }
+        void calibratePenSpeed()
+        {
+            auto constrain = [](int val, int min, int max) -> bool
+            {
+                return (val < min ? min : (val > max ? max : val));
+            };
+
+            Button button;
+            console << newline << "Calibrating pen speed:" << newline
+                   << "W - faster" << newline
+                   << "S - slower" << newline
+                   << "T - try" << newline
+                   << "C - accept" << newline;
+
+            do
+            {
+                button = ButtonManager::waitForAnyPress();
+
+                switch (button)
+                {
+                case 'w':
+                    p->mZSpeed = constrain(p->mZSpeed + 5, 15, 100);
+                    p->mZ.setSpeed(p->mZSpeed);
+                    break;
+
+                case 's':
+                    p->mZSpeed = constrain(p->mZSpeed - 5, 15, 100);
+                    p->mZ.setSpeed(p->mZSpeed);
+                    break;
+
+                case 't':
+                    penTest();
+
+                default:
+                    break;
+                }
+            } while(button != 'c');
+        }
+
+        void penTest()
+        {
+            p->PenDown();
+            p->PenUp();
+        }
+    };
+
+    class ImagePreparer
+    {
+        Printer *p;
+
+    public:
+        ImagePreparer(Printer* parent) : p(parent) {}
+
+        void prepareImage()
+        {
+           p->sdReader.prepareSD(p->imageDataFileName);
+           int widthMaxFromFile = p->sdReader.parseInt();
+           int heightMaxFromFile = p->sdReader.parseInt();
+
+           checkImageDimentions (widthMaxFromFile, heightMaxFromFile);
+
+           p->rowsLeft = p->sdReader.parseInt();
+        }
+
+    private:
+        void checkImageDimentions(int widthMaxFromFile, int heightMaxFromFile)
+        {
+            if(  widthMaxFromFile != p->WIDTH_MAX
+               || heightMaxFromFile != p->HEIGHT_MAX )
+            {
+                while(1)
+                {
+                    console << newline << "Image dimentions don't match!!";
+                    ButtonManager::waitForAnyPress();
+                }
+            }
+        }
+    };
+
+    Calibrator calibrator{this};
+    ImagePreparer imagePreparer{this};
+
 public:
 
     Printer()
@@ -61,12 +296,12 @@ public:
         mY.setSpeed(mYSpeed);
         mZ.setSpeed(mZSpeed);
 
-        mX.setReversedPolarity(true);
+        mX.setReversedPolarity(true); // zależne od konstrukcji
     }
 
     void start()
     {
-        console << newline << "Press any key to start: " << newline;
+        console << newline << "Press s key to start: " << newline;
         ButtonManager::waitForAnyPress();
 
         preparePrinter();
@@ -80,193 +315,10 @@ private:
 
     void preparePrinter()
     {
-        calibrateY();
-        calibrateX();
-        calibratePen();
-
-        prepareImage();
+        calibrator.calibratePrinter();
+        imagePreparer.prepareImage();
 
         displayCalibrationParameters();
-    }
-
-
-    void calibrateY()
-    {
-        mY.setSpeed(mYSpeed / 2);
-        mY.start();
-        console << "Press any button when Y i calibrated: ";
-
-        ButtonManager::waitForAnyPress();
-
-        mY.stop();
-        mY.setSpeed(mYSpeed);
-        yCurrent = 0;
-
-        console << newline << "Calibrated Y axis" << newline;
-    }
-
-    void calibrateX()
-    {
-        mX.start(true);
-        while (lTouch.isPressed() == false);
-        mX.stop();
-
-        mX.rotate(xDistanceFromBoundry);
-
-        directionOfXMovement = Direction::toRight;
-        xCurrent = 0;
-
-        console << newline << "Calibrated X axis" << newline;
-    }
-
-
-
-    void calibratePen()
-    {
-        Button button;
-        do
-        {
-            console << newline << "Calibrating pen:" << newline
-                   << "A - amplitude calibration" << newline
-                   << "P - position calibration" << newline
-                   << "S - speed calibration" << newline
-                   << "T - try" << newline
-                   << "C - accept" << newline;
-
-            button = ButtonManager::waitForAnyPress();
-
-            switch (button)
-            {
-            case 'a':
-                calibratePenAmplitude();
-                break;
-
-            case 'p':
-                calibratePenPosition();
-                break;
-            case 's':
-                calibratePenSpeed();
-                break;
-
-            case 't':
-                penTest();
-                break;
-            }
-        } while(button != 'c');
-        console << newline << "Calibrated pen Z axis" << newline;
-    }
-
-    void calibratePenAmplitude()
-    {
-        Button button;
-        console << newline << "Calibrating pen amplitude:" << newline
-               << "Q - top higher" << newline
-               << "A - top lower" << newline
-               << "E - down higher" << newline
-               << "D - down lower" << newline
-               << "T - try" << newline
-               << "C - accept" << newline << newline;
-        do
-        {
-            button = ButtonManager::waitForAnyPress();
-
-            switch (button)
-            {
-                case 'q':
-                    zRotation += zCalibrationStep;
-                    mZ.rotate(-zCalibrationStep);
-                    break;
-                case 'a':
-                    zRotation -= zCalibrationStep;
-                    mZ.rotate(zCalibrationStep);
-                    break;
-
-                case 'e':
-                    zRotation -= zCalibrationStep;
-                    break;
-
-                case 'd':
-                    zRotation += zCalibrationStep;
-                    break;
-
-                case 't':
-                    penTest();
-                    break;
-
-                default:
-                    break;
-            }
-        } while(button != 'c');
-    }
-
-    void calibratePenPosition()
-    {
-        Button button;
-        console << newline << "Calibrating pen position:" << newline
-               << "W - pen higher" << newline
-               << "S - pen lower" << newline
-               << "T - try" << newline
-               << "C - accept" << newline;
-
-        do
-        {
-            button = ButtonManager::waitForAnyPress();
-
-            switch (button)
-            {
-            case 'w':
-                mZ.rotate(-zCalibrationStep);
-                break;
-
-            case 's':
-                mZ.rotate(zCalibrationStep);
-                break;
-
-            case 't':
-                penTest();
-
-            default:
-                break;
-            }
-        } while(button != 'c');
-    }
-    void calibratePenSpeed()
-    {
-        auto constrain = [](int val, int min, int max) -> bool
-        {
-            return (val < min ? min : (val > max ? max : val));
-        };
-
-        Button button;
-        console << newline << "Calibrating pen speed:" << newline
-               << "W - faster" << newline
-               << "S - slower" << newline
-               << "T - try" << newline
-               << "C - accept" << newline;
-
-        do
-        {
-            button = ButtonManager::waitForAnyPress();
-
-            switch (button)
-            {
-            case 'w':
-                mZSpeed = constrain(mZSpeed + 5, 15, 100);
-                mZ.setSpeed(mZSpeed);
-                break;
-
-            case 's':
-                mZSpeed = constrain(mZSpeed - 5, 15, 100);
-                mZ.setSpeed(mZSpeed);
-                break;
-
-            case 't':
-                penTest();
-
-            default:
-                break;
-            }
-        } while(button != 'c');
     }
 
     void calibratePenAxisIfKeyPressed()
@@ -277,31 +329,7 @@ private:
 
             if(button == 'c')
             {
-                calibratePen();
-            }
-        }
-    }
-
-    void prepareImage()
-    {
-       sdReader.prepareSD(imageDataFileName);
-       int widthMaxFromFile = sdReader.parseInt();
-       int heightMaxFromFile = sdReader.parseInt();
-
-       checkImageDimentions (widthMaxFromFile, heightMaxFromFile);
-
-       rowsLeft = sdReader.parseInt();
-    }
-
-    void checkImageDimentions(int width, int height)
-    {
-        if(  widthMaxFromFile != WIDTH_MAX
-           || heightMaxFromFile != HEIGHT_MAX )
-        {
-            while(1)
-            {
-                console << newline << "Image dimentions don't match!!";
-                ButtonManager::waitForAnyPress();
+                calibrator.calibratePen();
             }
         }
     }
@@ -311,9 +339,9 @@ private:
         while(getNextRowIfAvailable() == true)
         {
             printRow();
-
             moveY(1);
 
+            showStats();
             calibratePenAxisIfKeyPressed();
         }
 
@@ -340,7 +368,7 @@ private:
 
         for(auto & line : rowToDraw)
         {
-            auto distance = distanceToLine(line, directionOfXMovement);
+            auto distance = getDistanceToLineFromCurrentPosition(line, directionOfXMovement);
             auto lineLength = line.length();
 
             moveX(distance);
@@ -364,18 +392,12 @@ private:
             return Direction::toLeft;
     }
 
-    int distanceToLine(const Line line, Direction direction )
+    int getDistanceToLineFromCurrentPosition(const Line line, Direction direction )
     {
         if(direction == Direction::toRight)
             return line.a - xCurrent;
         else if(direction == Direction::toLeft)
             return line.b - xCurrent;
-    }
-
-    void penTest()
-    {
-        PenDown();
-        PenUp();
     }
 
     void PenDown()
@@ -401,13 +423,12 @@ private:
                    << "xCurrent = " << xCurrent << newline
                    <<  "distance = " << distance << newline;
 
-            syst.waitMS(2000);
+            sys.delay(2000);
 
             while(true);
         }
 
-        mX.rotate(distance * PIX_ROTATION);
-
+        mX.rotate(distance * ROTATION_PER_PIXEL);
         xCurrent += distance;
 
         return true;
@@ -421,26 +442,22 @@ private:
                    << "xCurrent = " << xCurrent << newline
                    <<  "distance = " << distance << newline;
 
-            syst.waitMS(2000);
+            sys.delay(2000);
 
             while(true);
         }
 
         yCurrent += distance;
-        mY.rotate(-distance * PIX_ROTATION, immediateReturn);
+        mY.rotate(-distance * ROTATION_PER_PIXEL, immediateReturn);
     }
 
-    void pauseButtonPushed()
-    {
-        // TODO
-    }
 
     void displayCalibrationParameters()
     {
         #define DISP(VAL) console << newline << #VAL " : " << VAL
         DISP(zRotation);
-        DISP(xDistanceFromBoundry);
-        DISP(PIX_ROTATION);
+        DISP(xDistanceFromBoundryAterCalibration);
+        DISP(ROTATION_PER_PIXEL);
         #undef DISP
     }
 
