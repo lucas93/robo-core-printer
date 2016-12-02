@@ -1,6 +1,5 @@
 #include "hFramework.h"
 #include "SerialDisplay.h"
-#include "ConvertedImage.h"
 
 #include "Printer.h"
 
