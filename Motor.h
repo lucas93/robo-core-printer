@@ -23,8 +23,11 @@ public:
     RegulatedMotor(const RegulatedMotor&) = delete;
 
 
-    RegulatedMotor()
+    RegulatedMotor(speed_unit speed, Polarity polarity = Polarity::Normal) : speed(speed)
     {
+        if(polarity == Polarity::Reversed)
+            reversed = true;
+
         switch(motorNumber)
         {
         case 1: motor = &hMot1;

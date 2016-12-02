@@ -19,12 +19,12 @@ private:
     String imageDataFileName = "image.txt";
     SDCardReader sdReader;
 
-    RegulatedMotor<2> mX;
-    RegulatedMotor<1> mY;
-    RegulatedMotor<6> mZ;
     const int mXSpeed = 80;
     const int mYSpeed = 30;
     int mZSpeed = 100;
+    RegulatedMotor<2> mX{mXSpeed, Polarity::Reversed};
+    RegulatedMotor<1> mY{mYSpeed};
+    RegulatedMotor<6> mZ{mZSpeed};
     Lego_Touch rTouch = Lego_Touch(hSens2);
     Lego_Touch lTouch = Lego_Touch(hSens1);
 
@@ -47,6 +47,7 @@ private:
 
     enum class Direction { toRight, toLeft };
     Direction directionOfXMovement;
+
 
     class Calibrator
     {
@@ -416,15 +417,6 @@ private:
 
 public:
 
-    RoboCorePrinter()
-    {
-        mX.setSpeed(mXSpeed);
-        mY.setSpeed(mYSpeed);
-        mZ.setSpeed(mZSpeed);
-
-        mX.setReversedPolarity(true); // zależne od konstrukcji
-    }
-
     void start()
     {
         console << newline << "Press s key to start: " << newline;
@@ -436,10 +428,6 @@ public:
 
         console << newline << "Done!";
     }
-
-
-
-
 
 };
 
