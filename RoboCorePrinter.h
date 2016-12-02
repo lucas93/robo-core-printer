@@ -59,6 +59,8 @@ private:
             calibrateY();
             calibrateX();
             calibratePen();
+
+            displayCalibrationParameters();
         }
 
         void calibratePen()
@@ -242,8 +244,17 @@ private:
 
         void penTest()
         {
-            p->PenDown();
-            p->PenUp();
+            p->printer.PenDown();
+            p->printer.PenUp();
+        }
+
+        void displayCalibrationParameters()
+        {
+            #define DISP(VAL) console << newline << #VAL " : " << VAL
+            DISP(p->zRotation);
+            DISP(p->xDistanceFromBoundryAterCalibration);
+            DISP(p->ROTATION_PER_PIXEL);
+            #undef DISP
         }
     };
 
@@ -280,8 +291,128 @@ private:
         }
     };
 
+    class Printer
+    {
+        RoboCorePrinter *p;
+
+    public:
+        Printer(RoboCorePrinter* parent) : p(parent) {}
+
+        void calibratePenAxisIfKeyPressed()
+        {
+            if(Serial.available() > 0)
+            {
+                char key = Serial.getch();
+
+                if(key == 'c')
+                {
+                    p->calibrator.calibratePen();
+                }
+            }
+        }
+
+        void printImage()
+        {
+            while(getNextRowIfAvailable() == true)
+            {
+                printRow();
+                moveY(1);
+
+                showStats();
+                calibratePenAxisIfKeyPressed();
+            }
+
+        }
+
+        bool getNextRowIfAvailable()
+        {
+            if (p->rowsLeft > 0)
+            {
+                --(p->rowsLeft);
+                p->currentRow = p->sdReader.parseRow();
+                return true;
+            }
+            return false;
+        }
+
+        void printRow()
+        {
+            p->directionOfXMovement = chooseDirection();
+            Row rowToDraw = p->currentRow;
+
+            if(p->directionOfXMovement == Direction::toLeft)
+                rowToDraw = reverse(p->currentRow);
+
+            for(auto & line : rowToDraw)
+            {
+                auto distance = getDistanceToLineFromCurrentPosition(line, p->directionOfXMovement);
+                auto lineLength = line.length();
+
+                moveX(distance);
+                PenDown();
+                moveX(lineLength, p->directionOfXMovement);
+                PenUp();
+            }
+        }
+
+        Direction chooseDirection()
+        {
+            auto firstPointInRow = p->currentRow[0].a;
+            auto lastPointInRow = p->currentRow[p->currentRow.size() - 1].b;
+
+            auto distanceToFirstPointInRow = abs(p->xCurrent - firstPointInRow);
+            auto distanceToLastPointInRow = abs(p->xCurrent - lastPointInRow);
+
+            if(distanceToFirstPointInRow < distanceToLastPointInRow)
+                return Direction::toRight;
+            else
+                return Direction::toLeft;
+        }
+
+        int getDistanceToLineFromCurrentPosition(const Line line, Direction direction )
+        {
+            if(direction == Direction::toRight)
+                return line.a - p->xCurrent;
+            else if(direction == Direction::toLeft)
+                return line.b - p->xCurrent;
+        }
+
+        void PenDown()
+        {
+            p->mZ.rotate(p->zRotation);
+            LED2.toggle();
+        }
+
+        void PenUp()
+        {
+            p->mZ.rotate(-(p->zRotation));
+            LED2.toggle();
+        }
+
+        void moveX(int distance, Direction direction = Direction::toRight)
+        {
+            if (direction == Direction::toLeft)
+                distance = -distance;
+
+            p->mX.rotate(distance * p->ROTATION_PER_PIXEL);
+            p->xCurrent += distance;
+        }
+
+        void moveY(int distance, bool immediateReturn = false)
+        {
+            p->yCurrent += distance;
+            p->mY.rotate(-distance * p->ROTATION_PER_PIXEL, immediateReturn);
+        }
+
+        void showStats()
+        {
+            console << newline << "Rows left to print: " << p->rowsLeft;
+        }
+    };
+
     Calibrator calibrator{this};
     ImagePreparer imagePreparer{this};
+    Printer printer{this};
 
 public:
 
@@ -299,167 +430,17 @@ public:
         console << newline << "Press s key to start: " << newline;
         Serial.getch();
 
-        preparePrinter();
-
-        printImage();
+        calibrator.calibratePrinter();
+        imagePreparer.prepareImage();
+        printer.printImage();
 
         console << newline << "Done!";
     }
 
-private:
-
-    void preparePrinter()
-    {
-        calibrator.calibratePrinter();
-        imagePreparer.prepareImage();
-
-        displayCalibrationParameters();
-    }
-
-    void calibratePenAxisIfKeyPressed()
-    {
-        if(Serial.available() > 0)
-        {
-            char key = Serial.getch();
-
-            if(key == 'c')
-            {
-                calibrator.calibratePen();
-            }
-        }
-    }
-
-    void printImage()
-    {
-        while(getNextRowIfAvailable() == true)
-        {
-            printRow();
-            moveY(1);
-
-            showStats();
-            calibratePenAxisIfKeyPressed();
-        }
-
-    }
-
-    bool getNextRowIfAvailable()
-    {
-        if (rowsLeft > 0)
-        {
-            --rowsLeft;
-            currentRow = sdReader.parseRow();
-            return true;
-        }
-        return false;
-    }
-
-    void printRow()
-    {
-        directionOfXMovement = chooseDirection();
-        Row rowToDraw = currentRow;
-
-        if(directionOfXMovement == Direction::toLeft)
-            rowToDraw = reverse(currentRow);
-
-        for(auto & line : rowToDraw)
-        {
-            auto distance = getDistanceToLineFromCurrentPosition(line, directionOfXMovement);
-            auto lineLength = line.length();
-
-            moveX(distance);
-            PenDown();
-            moveX(lineLength, directionOfXMovement);
-            PenUp();
-        }
-    }
-
-    Direction chooseDirection()
-    {
-        auto firstPointInRow = currentRow[0].a;
-        auto lastPointInRow = currentRow[currentRow.size() - 1].b;
-
-        auto distanceToFirstPointInRow = abs(xCurrent - firstPointInRow);
-        auto distanceToLastPointInRow = abs(xCurrent - lastPointInRow);
-
-        if(distanceToFirstPointInRow < distanceToLastPointInRow)
-            return Direction::toRight;
-        else
-            return Direction::toLeft;
-    }
-
-    int getDistanceToLineFromCurrentPosition(const Line line, Direction direction )
-    {
-        if(direction == Direction::toRight)
-            return line.a - xCurrent;
-        else if(direction == Direction::toLeft)
-            return line.b - xCurrent;
-    }
-
-    void PenDown()
-    {
-        mZ.rotate(zRotation);
-        LED2.toggle();
-    }
-
-    void PenUp()
-    {
-        mZ.rotate(-zRotation);
-        LED2.toggle();
-    }
-
-    bool moveX(int distance, Direction direction = Direction::toRight)
-    {
-        if (direction == Direction::toLeft)
-            distance = -distance;
-
-        if (xCurrent + distance > WIDTH_MAX || xCurrent + distance < 0)
-        {
-            console << "WIDTH_MAX reached!" << newline
-                   << "xCurrent = " << xCurrent << newline
-                   <<  "distance = " << distance << newline;
-
-            sys.delay(2000);
-
-            while(true);
-        }
-
-        mX.rotate(distance * ROTATION_PER_PIXEL);
-        xCurrent += distance;
-
-        return true;
-    }
-
-    void moveY(int distance, bool immediateReturn = false)
-    {
-        if (yCurrent + distance > HEIGHT_MAX || yCurrent + distance < 0)
-        {
-            console << "WIDTH_MAX reached!" << newline
-                   << "xCurrent = " << xCurrent << newline
-                   <<  "distance = " << distance << newline;
-
-            sys.delay(2000);
-
-            while(true);
-        }
-
-        yCurrent += distance;
-        mY.rotate(-distance * ROTATION_PER_PIXEL, immediateReturn);
-    }
 
 
-    void displayCalibrationParameters()
-    {
-        #define DISP(VAL) console << newline << #VAL " : " << VAL
-        DISP(zRotation);
-        DISP(xDistanceFromBoundryAterCalibration);
-        DISP(ROTATION_PER_PIXEL);
-        #undef DISP
-    }
 
-    void showStats()
-    {
-        console << newline << "Rows left to print: " << rowsLeft;
-    }
+
 };
 
 #endif //ROBOCOREPRINTERFRONT_ROBOCOREPRINTER_H
