@@ -22,11 +22,6 @@ struct Line
                b == other.b;
     }
 
-    bool isPoint()
-    {
-        return a == b;
-    }
-
     Int length() const { return b - a; }
 
     String toString()  const
@@ -52,20 +47,5 @@ ostream & operator<<(ostream & ostr, const Line & line)
 }
 
 #endif // #ifndef __ISENSOR_H__
-
-
-
-#ifdef __ISENSOR_H__
-// dla części programu działającej na RoboCore
-#include "SerialDisplay.h"
-template<>
-SerialDisplay& operator<< (SerialDisplay& serial, const Line & line)
-{
-    serial << line.a << " "
-           << line.b;
-    return serial;
-}
-
-#endif // #ifdef __ISENSOR_H__
 
 #endif //ROBOCOREPRINTERFRONT_LINE_H
