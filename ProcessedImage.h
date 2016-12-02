@@ -6,10 +6,10 @@
 
 #include <fstream>
 
-using ProcessedImage = std::vector<Row>;
+using ConvertedImage = std::vector<Row>;
 
 #ifndef __ISENSOR_H__
-ostream & operator<<(ostream & ostr, const ProcessedImage & image)
+ostream & operator<<(ostream & ostr, const ConvertedImage & image)
 {
     ostr << image.size() << "\n";
     for(const auto& row : image)
@@ -42,7 +42,7 @@ Vector reverse(Vector vec)
 
 
 
-class ProcessedImageManager
+class ConvertedImageManager
 {
 private:
     fstream textFile;
@@ -52,14 +52,14 @@ private:
 
 public:
 
-    ProcessedImage loadProcessedImageFromSD(const string &filename)
+    ConvertedImage loadConvertedImageFromSD(const string &filename)
     {
         #ifdef __ISENSOR_H__
         int MAX_WIDTH = sdReader.parseInt();
         int MAX_HEIGHT = sdReader.parseInt();
 
         int height = sdReader.parseInt();
-        ProcessedImage result(height);
+        ConvertedImage result(height);
         for(auto & row : result)
             row = getRowFromSD();
 
@@ -67,7 +67,7 @@ public:
         #endif // #ifdef __ISENSOR_H__
     }
 
-    ProcessedImage loadProcessedImageFromTextFile(string &filename)
+    ConvertedImage loadConvertedImageFromTextFile(string &filename)
     {
         textFile.open(filename.c_str());
 
@@ -80,7 +80,7 @@ public:
         textFile >> WIDTH_MAX;
 
         textFile >> numberOfRows;
-        auto img = ProcessedImage(numberOfRows);
+        auto img = ConvertedImage(numberOfRows);
 
         for (auto & row : img)
             row = getRow();

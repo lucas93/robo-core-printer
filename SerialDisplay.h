@@ -4,7 +4,7 @@
 
 #include <string>
 #include <vector>
-#include "ProcessedImage.h"
+#include "ConvertedImage.h"
 
 #ifdef __HCLOUDCLIENT_H__
 

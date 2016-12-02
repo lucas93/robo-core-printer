@@ -43,7 +43,7 @@ struct Line
 };
 
 #ifndef __ISENSOR_H__
-
+// dla części programu działającej na PC
 ostream & operator<<(ostream & ostr, const Line & line)
 {
     ostr << line.a << " "
@@ -56,7 +56,7 @@ ostream & operator<<(ostream & ostr, const Line & line)
 
 
 #ifdef __ISENSOR_H__
-
+// dla części programu działającej na RoboCore
 #include "SerialDisplay.h"
 template<>
 SerialDisplay& operator<< (SerialDisplay& serial, const Line & line)
