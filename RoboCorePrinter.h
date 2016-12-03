@@ -41,8 +41,6 @@ private:
 
     int xDistanceFromBoundryAterCalibration = 1000;
 
-    bool isPauseButtonPushed = false;
-
     int ROTATION_PER_PIXEL = 80; // elemental servo rotation for 1 pixel
 
     enum class Direction { toRight, toLeft };

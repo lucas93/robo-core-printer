@@ -7,8 +7,6 @@ void hMain()
 {
     while (1)
     {
-        LED1.toggle();
-
         RoboCorePrinter printer;
 
         printer.start();
